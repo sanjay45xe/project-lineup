@@ -1,0 +1,1414 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Lineup — Beat the Queue</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Barlow+Condensed:wght@300;400;600;700;900&family=Barlow:wght@300;400;500&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{--ink:#0d0e0f;--paper:#f5f3ef;--accent:#e8400c;--muted:#8a8880;--border:#d4d0c8;--card:#ffffff;--green:#2ecc71;--amber:#f39c12;--red:#e74c3c}
+html{scroll-behavior:smooth}
+body{font-family:'Barlow',sans-serif;background:var(--paper);color:var(--ink);overflow-x:hidden}
+#join,#how,#usecases{scroll-margin-top:64px}
+
+/* NAV */
+nav{position:fixed;top:0;left:0;right:0;z-index:200;display:flex;align-items:center;justify-content:space-between;padding:0 2.5rem;height:56px;background:var(--ink);border-bottom:1px solid #2a2b2d}
+.nav-logo{font-family:'Barlow Condensed',sans-serif;font-weight:900;font-size:1.4rem;color:var(--paper);letter-spacing:.04em;text-transform:uppercase}
+.nav-logo span{color:var(--accent)}
+.nav-links{display:flex;gap:2rem;list-style:none}
+.nav-links a{font-family:'DM Mono',monospace;font-size:.72rem;color:#888;text-decoration:none;letter-spacing:.06em;text-transform:uppercase;transition:color .15s;cursor:pointer}
+.nav-links a:hover{color:var(--paper)}
+#owner-nav-btn{font-family:'DM Mono',monospace;font-size:.72rem;letter-spacing:.06em;text-transform:uppercase;padding:.45rem 1.1rem;background:transparent;color:#555;border:1px solid #333;cursor:pointer;transition:all .15s}
+#owner-nav-btn:hover{color:var(--paper);border-color:#666}
+
+/* TOKEN BANNER */
+#token-banner{position:fixed;top:56px;left:0;right:0;z-index:190;background:#0d1f14;border-bottom:1px solid #1a6b3c;padding:.6rem 2.5rem;display:none;align-items:center;justify-content:space-between}
+#token-banner.show{display:flex}
+.token-label{font-family:'DM Mono',monospace;font-size:.65rem;color:#4caf50;letter-spacing:.1em;text-transform:uppercase}
+#notif-btn{font-family:'DM Mono',monospace;font-size:.62rem;letter-spacing:.08em;text-transform:uppercase;background:transparent;border:1px solid #1a6b3c;color:#4caf50;padding:.3rem .8rem;cursor:pointer;transition:background .15s}
+#notif-btn:hover{background:#0d2010}
+#notif-btn.enabled{background:#1a6b3c;color:#fff}
+
+/* TOAST */
+#toast{position:fixed;bottom:2rem;right:2rem;z-index:999;background:var(--ink);border:1px solid var(--accent);padding:1rem 1.5rem;max-width:320px;transform:translateY(120%);opacity:0;transition:transform .35s ease,opacity .35s ease}
+#toast.show{transform:translateY(0);opacity:1}
+.toast-title{font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:1rem;text-transform:uppercase;color:var(--paper);letter-spacing:.06em;margin-bottom:.3rem}
+.toast-body{font-family:'DM Mono',monospace;font-size:.68rem;color:#888;letter-spacing:.04em}
+.toast-close{position:absolute;top:.6rem;right:.8rem;background:none;border:none;color:#555;cursor:pointer;font-size:.9rem}
+
+/* OWNER MODAL */
+#owner-overlay{display:none;position:fixed;inset:0;z-index:500;background:rgba(0,0,0,.7);align-items:center;justify-content:center}
+#owner-overlay.show{display:flex}
+.owner-modal{background:var(--ink);border:1px solid #333;padding:2.5rem;width:420px;max-width:90vw;position:relative}
+.modal-title{font-family:'Barlow Condensed',sans-serif;font-weight:900;font-size:1.5rem;text-transform:uppercase;color:var(--paper);margin-bottom:.4rem}
+.modal-sub{font-family:'DM Mono',monospace;font-size:.65rem;color:#555;letter-spacing:.08em;text-transform:uppercase;margin-bottom:2rem}
+.modal-field{margin-bottom:1.25rem}
+.modal-field label{display:block;font-family:'DM Mono',monospace;font-size:.62rem;color:#666;letter-spacing:.1em;text-transform:uppercase;margin-bottom:.5rem}
+.modal-field input{width:100%;background:#1a1b1d;border:1px solid #333;color:var(--paper);padding:.75rem 1rem;font-family:'DM Mono',monospace;font-size:.85rem;outline:none;transition:border-color .15s}
+.modal-field input:focus{border-color:var(--accent)}
+.modal-err{font-family:'DM Mono',monospace;font-size:.62rem;color:var(--red);letter-spacing:.06em;margin-bottom:1rem;display:none}
+.modal-err.show{display:block}
+.modal-btn{width:100%;font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:.95rem;letter-spacing:.12em;text-transform:uppercase;padding:.85rem;background:var(--accent);color:#fff;border:none;cursor:pointer;transition:background .15s}
+.modal-btn:hover{background:#c73308}
+.modal-close{position:absolute;top:1rem;right:1rem;background:none;border:none;color:#555;cursor:pointer;font-size:1.1rem}
+
+/* OWNER DASHBOARD */
+#owner-dashboard{display:none;position:fixed;inset:0;z-index:400;background:var(--ink);overflow-y:auto;padding-top:56px}
+#owner-dashboard.show{display:block}
+.dash-header{padding:2rem 3rem 1.5rem;border-bottom:1px solid #222;display:flex;align-items:center;justify-content:space-between}
+.dash-title{font-family:'Barlow Condensed',sans-serif;font-weight:900;font-size:2rem;text-transform:uppercase;color:var(--paper)}
+.dash-subtitle{font-family:'DM Mono',monospace;font-size:.62rem;color:var(--accent);letter-spacing:.1em;text-transform:uppercase;margin-top:.25rem}
+.dash-btn{font-family:'DM Mono',monospace;font-size:.68rem;letter-spacing:.08em;text-transform:uppercase;padding:.5rem 1.1rem;border:1px solid #333;background:transparent;color:#888;cursor:pointer;transition:all .15s}
+.dash-btn:hover{color:var(--paper);border-color:#666}
+.dash-btn.danger{border-color:#5a1a1a;color:#c44}
+.dash-btn.danger:hover{border-color:var(--red);color:var(--red)}
+.dash-body{padding:2rem 3rem}
+.dash-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:1rem;margin-bottom:2.5rem}
+.dash-stat{background:#111213;border:1px solid #222;padding:1.25rem 1.5rem}
+.dash-stat-num{font-family:'Barlow Condensed',sans-serif;font-weight:900;font-size:2rem;color:var(--accent);line-height:1}
+.dash-stat-label{font-family:'DM Mono',monospace;font-size:.6rem;color:#555;letter-spacing:.08em;text-transform:uppercase;margin-top:.3rem}
+.dash-counters{display:grid;grid-template-columns:repeat(2,1fr);gap:1rem;margin-bottom:2rem}
+.dash-counter{background:#111213;border:1px solid #222;padding:1.5rem}
+.dc-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem}
+.dc-name{font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:1rem;text-transform:uppercase;letter-spacing:.06em;color:var(--paper)}
+.dc-row{display:flex;justify-content:space-between;align-items:center;padding:.4rem 0;border-bottom:1px solid #1a1b1d}
+.dc-row:last-child{border-bottom:none}
+.dc-row-label{font-family:'DM Mono',monospace;font-size:.62rem;color:#555;letter-spacing:.06em;text-transform:uppercase}
+.dc-row-val{font-family:'DM Mono',monospace;font-size:.78rem;color:var(--paper);font-weight:500}
+.token-queue-table{width:100%;border-collapse:collapse}
+.token-queue-table th{font-family:'DM Mono',monospace;font-size:.6rem;color:#444;letter-spacing:.1em;text-transform:uppercase;padding:.6rem 1rem;text-align:left;border-bottom:1px solid #1e1f21}
+.token-queue-table td{font-family:'DM Mono',monospace;font-size:.72rem;color:#888;padding:.7rem 1rem;border-bottom:1px solid #1a1b1d}
+.serve-btn{font-family:'DM Mono',monospace;font-size:.6rem;letter-spacing:.06em;text-transform:uppercase;padding:.3rem .8rem;background:transparent;border:1px solid #1a6b3c;color:#4caf50;cursor:pointer;transition:background .15s}
+.serve-btn:hover{background:#0d2010}
+
+/* VENUE MANAGEMENT */
+.vf-tab{font-family:'DM Mono',monospace;font-size:.65rem;letter-spacing:.08em;text-transform:uppercase;padding:.75rem 1.25rem;background:transparent;border:none;border-bottom:2px solid transparent;color:#555;cursor:pointer;transition:all .15s;white-space:nowrap}
+.vf-tab:hover{color:#aaa}
+.vf-active{color:var(--accent)!important;border-bottom-color:var(--accent)!important}
+.vtype-btn{font-family:'DM Mono',monospace;font-size:.65rem;letter-spacing:.06em;text-transform:uppercase;padding:.5rem 1rem;background:#1a1b1d;border:1px solid #2a2b2d;color:#666;cursor:pointer;transition:all .15s;white-space:nowrap}
+.vtype-btn:hover{border-color:#555;color:#aaa}
+.vtype-btn.selected{background:#1a0a05;border-color:var(--accent);color:var(--accent)}
+.venue-card{background:#111213;padding:1.5rem;position:relative;transition:background .15s}
+.venue-card:hover{background:#141516}
+.vc-type-badge{display:inline-block;font-family:'DM Mono',monospace;font-size:.55rem;letter-spacing:.08em;text-transform:uppercase;padding:2px 8px;border-radius:2px;margin-bottom:.75rem}
+.vc-actions{display:flex;gap:6px;margin-top:1rem}
+.vc-btn{font-family:'DM Mono',monospace;font-size:.6rem;letter-spacing:.06em;text-transform:uppercase;padding:.4rem .85rem;background:transparent;cursor:pointer;transition:all .15s}
+.vc-edit{border:1px solid #2a2b2d;color:#666}
+.vc-edit:hover{border-color:#555;color:#aaa}
+.vc-delete{border:1px solid #3a1515;color:#844}
+.vc-delete:hover{border-color:var(--red);color:var(--red)}
+.vc-copy{border:1px solid #1a3a1a;color:#4a8a4a}
+.vc-copy:hover{border-color:var(--green);color:var(--green)}
+.cr-field label{display:block;font-family:'DM Mono',monospace;font-size:.6rem;color:#555;letter-spacing:.1em;text-transform:uppercase;margin-bottom:.4rem}
+.cr-field input{width:100%;background:#1a1b1d;border:1px solid #2a2b2d;color:var(--paper);padding:.6rem .8rem;font-family:'DM Mono',monospace;font-size:.8rem;outline:none;transition:border-color .15s}
+.cr-field input:focus{border-color:var(--accent)}
+.counter-inp-row{display:grid;grid-template-columns:80px 1fr 80px;gap:8px;align-items:center;margin-bottom:8px}
+.counter-inp-row label{font-family:'DM Mono',monospace;font-size:.6rem;color:#444;letter-spacing:.08em;text-transform:uppercase}
+.counter-inp-row input{background:#1a1b1d;border:1px solid #2a2b2d;color:var(--paper);padding:.5rem .75rem;font-family:'DM Mono',monospace;font-size:.78rem;outline:none;transition:border-color .15s;width:100%}
+.counter-inp-row input:focus{border-color:var(--accent)}
+
+/* HERO */
+.hero{min-height:100vh;display:grid;grid-template-columns:1fr 1fr;padding-top:56px}
+.hero-left{background:var(--ink);padding:5rem 3rem 4rem 3.5rem;display:flex;flex-direction:column;justify-content:center}
+.hero-eyebrow{font-family:'DM Mono',monospace;font-size:.7rem;letter-spacing:.14em;color:var(--accent);text-transform:uppercase;margin-bottom:1.5rem;display:flex;align-items:center;gap:.6rem}
+.live-dot{width:7px;height:7px;border-radius:50%;background:var(--accent);animation:pulse 1.6s infinite}
+@keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.5;transform:scale(.75)}}
+.hero-title{font-family:'Barlow Condensed',sans-serif;font-weight:900;font-size:clamp(3.5rem,7vw,6rem);line-height:.92;color:var(--paper);text-transform:uppercase;letter-spacing:-.01em;margin-bottom:2rem}
+.hero-title .accent{color:var(--accent)}
+.hero-sub{font-size:1rem;font-weight:300;line-height:1.7;color:#a8a5a0;max-width:380px;margin-bottom:3rem}
+.hero-buttons{display:flex;gap:1rem;flex-wrap:wrap}
+.btn-primary{font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:.95rem;letter-spacing:.1em;text-transform:uppercase;padding:.85rem 2rem;background:var(--accent);color:#fff;border:none;cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;gap:.5rem;transition:background .15s,transform .1s}
+.btn-primary:hover{background:#c73308;transform:translateY(-1px)}
+.btn-ghost{font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:.95rem;letter-spacing:.1em;text-transform:uppercase;padding:.85rem 2rem;background:transparent;color:var(--paper);border:1px solid #3a3b3e;cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;gap:.5rem;transition:border-color .15s}
+.btn-ghost:hover{border-color:#888}
+.hero-right{background:var(--paper);padding:5rem 3rem 4rem 3.5rem;display:flex;flex-direction:column;justify-content:center}
+.mockup-label{font-family:'DM Mono',monospace;font-size:.68rem;letter-spacing:.1em;color:var(--muted);text-transform:uppercase;margin-bottom:1.25rem}
+.mockup-phone{background:#1a1b1d;border-radius:28px;border:6px solid #2c2d30;padding:1.5rem 1.25rem;max-width:300px}
+.phone-status{display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem}
+.phone-venue{font-family:'DM Mono',monospace;font-size:.62rem;color:#555;letter-spacing:.08em;text-transform:uppercase}
+.phone-live{display:flex;align-items:center;gap:5px;font-family:'DM Mono',monospace;font-size:.6rem;color:#4caf50}
+.phone-live-dot{width:5px;height:5px;border-radius:50%;background:#4caf50;animation:pulse 1.4s infinite}
+.phone-token-strip{background:#0d1f14;border:1px solid #1a6b3c;border-radius:6px;padding:8px 12px;margin-bottom:1rem;display:flex;align-items:center;justify-content:space-between}
+.pt-label{font-family:'DM Mono',monospace;font-size:.58rem;color:#4caf50;letter-spacing:.08em;text-transform:uppercase}
+.pt-num{font-family:'Barlow Condensed',sans-serif;font-weight:900;font-size:1.3rem;color:#fff}
+.phone-heading{font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:.9rem;color:#f0ede8;text-transform:uppercase;letter-spacing:.06em;margin-bottom:.75rem}
+.counter-list{display:flex;flex-direction:column;gap:7px;margin-bottom:1.25rem}
+.counter-row{display:flex;align-items:center;gap:8px;background:#232427;border-radius:7px;padding:9px 11px;border:1px solid transparent}
+.counter-row.best{border-color:#1a6b3c;background:#0d1f14}
+.counter-num{font-family:'DM Mono',monospace;font-size:.6rem;color:#555;width:20px}
+.counter-name{font-size:.72rem;color:#c8c4bc;flex:1;font-weight:400}
+.counter-people{font-family:'DM Mono',monospace;font-size:.62rem;color:#666;min-width:30px;text-align:center}
+.counter-bar-wrap{flex:1;height:3px;background:#333;border-radius:2px;overflow:hidden}
+.counter-bar{height:100%;border-radius:2px}
+.bar-green{background:var(--green)}.bar-amber{background:var(--amber)}.bar-red{background:var(--red)}
+.counter-time{font-family:'DM Mono',monospace;font-size:.72rem;font-weight:500;min-width:32px;text-align:right}
+.time-green{color:var(--green)}.time-amber{color:var(--amber)}.time-red{color:var(--red)}
+.best-badge{font-family:'DM Mono',monospace;font-size:.5rem;letter-spacing:.08em;color:var(--green);text-transform:uppercase;background:#0d2010;padding:2px 6px;border-radius:3px}
+.phone-join-btn{width:100%;font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:.85rem;letter-spacing:.12em;text-transform:uppercase;padding:.7rem;background:var(--accent);color:#fff;border:none;border-radius:7px;cursor:pointer}
+
+/* TICKER */
+.ticker{background:var(--accent);overflow:hidden;height:36px;display:flex;align-items:center}
+.ticker-track{display:flex;animation:ticker 22s linear infinite;white-space:nowrap}
+.ticker-item{font-family:'DM Mono',monospace;font-size:.68rem;letter-spacing:.1em;color:#fff;padding:0 2.5rem;text-transform:uppercase}
+.ticker-sep{font-family:'DM Mono',monospace;font-size:.68rem;color:rgba(255,255,255,.4);padding:0 .5rem}
+@keyframes ticker{from{transform:translateX(0)}to{transform:translateX(-50%)}}
+
+/* JOIN SECTION */
+.section-join{background:var(--ink);border-top:1px solid #222}
+.join-top{display:grid;grid-template-columns:1fr 1fr}
+.join-left{padding:5rem 3.5rem;border-right:1px solid #222}
+.join-label{font-family:'DM Mono',monospace;font-size:.65rem;color:#555;letter-spacing:.1em;text-transform:uppercase;margin-bottom:.75rem}
+.join-title{font-family:'Barlow Condensed',sans-serif;font-weight:900;font-size:clamp(2.5rem,5vw,4rem);text-transform:uppercase;color:var(--paper);line-height:.92;margin-bottom:1.5rem}
+.join-title .accent{color:var(--accent)}
+.join-desc{font-size:.95rem;font-weight:300;line-height:1.7;color:#666;margin-bottom:2.5rem;max-width:400px}
+.join-form{display:flex;gap:0}
+.join-input{flex:1;background:#1a1b1d;border:1px solid #333;color:var(--paper);padding:.9rem 1.2rem;font-family:'DM Mono',monospace;font-size:.88rem;outline:none;transition:border-color .15s}
+.join-input::placeholder{color:#444}
+.join-input:focus{border-color:var(--accent)}
+.join-btn{font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:.9rem;letter-spacing:.12em;text-transform:uppercase;padding:.9rem 1.75rem;background:var(--accent);color:#fff;border:none;cursor:pointer;white-space:nowrap;transition:background .15s}
+.join-btn:hover{background:#c73308}
+.join-url-hint{font-family:'DM Mono',monospace;font-size:.65rem;color:#444;margin-top:.75rem;letter-spacing:.06em}
+.join-url-hint span{color:var(--accent)}
+.join-right{padding:5rem 3.5rem}
+.join-stats-title{font-family:'DM Mono',monospace;font-size:.65rem;color:var(--accent);letter-spacing:.12em;text-transform:uppercase;margin-bottom:2rem}
+.join-stats-grid{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:#222;border:1px solid #222;margin-bottom:2rem}
+.join-stat{background:#111213;padding:1.5rem 1.75rem}
+.js-num{font-family:'Barlow Condensed',sans-serif;font-weight:900;font-size:2.2rem;color:var(--accent);line-height:1}
+.js-label{font-family:'DM Mono',monospace;font-size:.6rem;color:#555;letter-spacing:.08em;text-transform:uppercase;margin-top:.3rem}
+.join-features{display:flex;flex-direction:column;gap:0;border:1px solid #222}
+.jf-row{display:flex;align-items:center;gap:1rem;padding:1rem 1.5rem;border-bottom:1px solid #1a1b1d}
+.jf-row:last-child{border-bottom:none}
+.jf-icon{font-size:1rem;flex-shrink:0;width:28px;text-align:center}
+.jf-text{font-size:.82rem;color:#666;font-weight:300}
+.jf-text strong{color:#aaa;font-weight:500}
+
+/* LIVE ROOM */
+.lrv-tab{font-family:'DM Mono',monospace;font-size:.68rem;letter-spacing:.08em;text-transform:uppercase;padding:1rem 1.5rem;background:transparent;border:none;border-bottom:2px solid transparent;color:#555;cursor:pointer;transition:all .15s;white-space:nowrap}
+.lrv-tab:hover{color:#aaa}
+.lrv-tab-active{color:var(--accent)!important;border-bottom-color:var(--accent)!important}
+
+/* SWITCH MODAL */
+#switch-modal{display:none;position:fixed;inset:0;z-index:600;background:rgba(0,0,0,.75);align-items:center;justify-content:center}
+#switch-modal.show{display:flex}
+.switch-modal-box{background:var(--ink);border:1px solid #333;padding:2rem;width:480px;max-width:92vw;position:relative;max-height:80vh;overflow-y:auto}
+
+/* HOW IT WORKS */
+.section-how{background:var(--paper);padding:5rem 3.5rem;border-top:1px solid var(--border)}
+.how-header{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:3.5rem}
+.how-title{font-family:'Barlow Condensed',sans-serif;font-weight:900;font-size:2.8rem;text-transform:uppercase;line-height:.95}
+.how-title .accent{color:var(--accent)}
+.how-sub{font-size:.9rem;font-weight:300;color:var(--muted);max-width:300px;line-height:1.7}
+.steps-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:0}
+.step{padding:2rem 1.75rem;border:1px solid var(--border);background:var(--card);position:relative}
+.step-num{font-family:'DM Mono',monospace;font-size:.62rem;color:var(--accent);letter-spacing:.1em;text-transform:uppercase;margin-bottom:1.25rem}
+.step-icon{font-size:1.4rem;margin-bottom:1.25rem}
+.step h3{font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:1.05rem;text-transform:uppercase;letter-spacing:.06em;margin-bottom:.6rem}
+.step p{font-size:.83rem;line-height:1.65;color:#5a5855;font-weight:300}
+.step-arrow{position:absolute;right:-14px;top:50%;transform:translateY(-50%);z-index:2;background:var(--card);width:28px;height:28px;display:flex;align-items:center;justify-content:center;font-size:.8rem;color:var(--accent);border:1px solid var(--border)}
+.formula-strip{background:#eceae4;padding:1.5rem 3.5rem;display:flex;align-items:center;gap:2rem;border-top:1px solid var(--border);flex-wrap:wrap}
+.formula-label{font-family:'DM Mono',monospace;font-size:.65rem;color:var(--muted);text-transform:uppercase;letter-spacing:.1em;flex-shrink:0}
+.formula{font-family:'DM Mono',monospace;font-size:.88rem;color:var(--ink);letter-spacing:.04em}
+.formula .var{color:#1a5c8c}
+.formula .op{color:var(--accent);padding:0 .4rem}
+.formula .eq{color:#aaa;padding:0 .4rem}
+
+/* USE CASES + STATS + FOOTER */
+.section-usecases{padding:5rem 3.5rem;border-top:1px solid var(--border)}
+.uc-title{font-family:'Barlow Condensed',sans-serif;font-weight:900;font-size:2.5rem;text-transform:uppercase;line-height:.95;margin-bottom:.5rem}
+.uc-sub{font-size:.88rem;color:var(--muted);font-weight:300;margin-bottom:2.5rem}
+.uc-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:0}
+.uc-card{padding:2rem 1.5rem;border:1px solid var(--border);background:var(--card);transition:background .15s}
+.uc-card:hover{background:#f8f6f1}
+.uc-icon{font-size:2rem;margin-bottom:1rem}
+.uc-card h3{font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:.95rem;text-transform:uppercase;letter-spacing:.06em;margin-bottom:.5rem}
+.uc-card p{font-size:.82rem;line-height:1.6;color:var(--muted);font-weight:300}
+.section-stats{background:var(--ink);padding:4rem 3.5rem;display:grid;grid-template-columns:repeat(4,1fr);gap:0;border-top:1px solid #222}
+.stat-item{padding:2rem;border-right:1px solid #2a2b2d}
+.stat-item:last-child{border-right:none}
+.stat-num{font-family:'Barlow Condensed',sans-serif;font-weight:900;font-size:3rem;color:var(--accent);line-height:1;margin-bottom:.4rem}
+.stat-label{font-size:.82rem;color:#666;font-weight:300;line-height:1.5}
+footer{background:var(--ink);padding:2rem 3.5rem;display:flex;align-items:center;justify-content:space-between;border-top:1px solid #222}
+.footer-logo{font-family:'Barlow Condensed',sans-serif;font-weight:900;font-size:1.1rem;color:var(--paper);text-transform:uppercase;letter-spacing:.06em}
+.footer-logo span{color:var(--accent)}
+.footer-note{font-family:'DM Mono',monospace;font-size:.62rem;color:#444;letter-spacing:.06em;text-transform:uppercase}
+
+/* DB STATUS */
+#db-status{display:flex;align-items:center;gap:6px;font-family:'DM Mono',monospace;font-size:.6rem;letter-spacing:.08em;text-transform:uppercase}
+.db-dot{width:6px;height:6px;border-radius:50%}
+.db-dot.connected{background:#4caf50;animation:pulse 2s infinite}
+.db-dot.disconnected{background:#e74c3c}
+.db-dot.connecting{background:#f39c12;animation:pulse 1s infinite}
+
+@media(max-width:900px){
+  .hero{grid-template-columns:1fr}
+  .hero-right{display:none}
+  .join-top{grid-template-columns:1fr}
+  .join-right{border-top:1px solid #222}
+  .steps-grid{grid-template-columns:1fr 1fr}
+  .uc-grid{grid-template-columns:1fr 1fr}
+  .section-stats{grid-template-columns:1fr 1fr}
+  .how-header{flex-direction:column;gap:1rem}
+  .dash-stats{grid-template-columns:1fr 1fr}
+  .dash-counters{grid-template-columns:1fr}
+}
+</style>
+</head>
+<body>
+
+<!-- TOAST -->
+<div id="toast">
+  <button class="toast-close" onclick="closeToast()">✕</button>
+  <div class="toast-title" id="toast-title">Notification</div>
+  <div class="toast-body" id="toast-body"></div>
+</div>
+
+<!-- TOKEN BANNER -->
+<div id="token-banner">
+  <div style="display:flex;align-items:center;gap:2rem;">
+    <div><div class="token-label">Your token</div><div style="font-family:'Barlow Condensed',sans-serif;font-weight:900;font-size:1.4rem;color:#fff;" id="banner-token">—</div></div>
+    <div><div class="token-label">Counter</div><div style="font-family:'DM Mono',monospace;font-size:.88rem;color:#aaa;" id="banner-counter">—</div></div>
+    <div><div class="token-label">People ahead</div><div style="font-family:'Barlow Condensed',sans-serif;font-weight:900;font-size:1.4rem;color:var(--amber);" id="banner-ahead">—</div></div>
+  </div>
+  <div style="display:flex;align-items:center;gap:1rem;">
+    <div style="font-family:'DM Mono',monospace;font-size:.65rem;color:#888;" id="banner-queue-pos"></div>
+    <button id="notif-btn" onclick="requestNotifications()">🔔 Enable alerts</button>
+  </div>
+</div>
+
+<!-- NAV -->
+<nav>
+  <div class="nav-logo">Line<span>up</span></div>
+  <ul class="nav-links">
+    <li><a onclick="goTo('join')">Join a room</a></li>
+    <li><a onclick="goTo('how')">How it works</a></li>
+    <li><a onclick="goTo('usecases')">Use cases</a></li>
+  </ul>
+  <div style="display:flex;align-items:center;gap:1rem;">
+    <div id="db-status"><span class="db-dot connecting" id="db-dot"></span><span id="db-label">connecting</span></div>
+    <button id="owner-nav-btn" onclick="openOwnerModal()">⚙ Owner</button>
+  </div>
+</nav>
+
+<!-- OWNER MODAL -->
+<div id="owner-overlay">
+  <div class="owner-modal">
+    <button class="modal-close" onclick="closeOwnerModal()">✕</button>
+    <div class="modal-title">Owner Access</div>
+    <div class="modal-sub">// restricted · enter credentials</div>
+    <div class="modal-field"><label>Username</label><input type="text" id="owner-user" placeholder="owner" autocomplete="off"></div>
+    <div class="modal-field"><label>Password</label><input type="password" id="owner-pass" placeholder="••••••••" onkeydown="if(event.key==='Enter')checkOwnerLogin()"></div>
+    <div class="modal-err" id="modal-err">Incorrect credentials. Access denied.</div>
+    <button class="modal-btn" onclick="checkOwnerLogin()">Access dashboard →</button>
+  </div>
+</div>
+
+<!-- OWNER DASHBOARD -->
+<div id="owner-dashboard">
+  <div class="dash-header">
+    <div>
+      <div class="dash-title">Owner Dashboard</div>
+      <div class="dash-subtitle">// lineup · venue management · live</div>
+    </div>
+    <div style="display:flex;gap:1rem;align-items:center;">
+      <button class="dash-btn" onclick="simulateServe()">▶ Simulate serve next</button>
+      <button class="dash-btn danger" onclick="closeOwnerDashboard()">✕ Exit dashboard</button>
+    </div>
+  </div>
+  <div class="dash-body">
+
+    <!-- VENUE MANAGEMENT -->
+    <div id="venue-mgmt">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1.5rem;">
+        <div>
+          <div style="font-family:'DM Mono',monospace;font-size:.62rem;color:var(--accent);letter-spacing:.12em;text-transform:uppercase;margin-bottom:.3rem;">// venue management</div>
+          <div style="font-family:'Barlow Condensed',sans-serif;font-weight:900;font-size:1.5rem;text-transform:uppercase;color:var(--paper);">Room Allocations</div>
+        </div>
+        <button onclick="openNewVenuePanel()" style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:.88rem;letter-spacing:.1em;text-transform:uppercase;padding:.7rem 1.5rem;background:var(--accent);color:#fff;border:none;cursor:pointer;" onmouseover="this.style.background='#c73308'" onmouseout="this.style.background='var(--accent)'">+ Allocate new room</button>
+      </div>
+      <div style="display:flex;gap:0;border-bottom:1px solid #222;margin-bottom:1.5rem;overflow-x:auto;">
+        <button onclick="filterVenues('all')"        id="vf-all"        class="vf-tab vf-active">All rooms</button>
+        <button onclick="filterVenues('restaurant')" id="vf-restaurant" class="vf-tab">🍽 Restaurants</button>
+        <button onclick="filterVenues('cafe')"       id="vf-cafe"       class="vf-tab">☕ Cafés</button>
+        <button onclick="filterVenues('shop')"       id="vf-shop"       class="vf-tab">🛍 Shops</button>
+        <button onclick="filterVenues('govt')"       id="vf-govt"       class="vf-tab">🏛 Govt/Office</button>
+        <button onclick="filterVenues('other')"      id="vf-other"      class="vf-tab">📦 Other</button>
+      </div>
+      <div style="display:flex;gap:0;margin-bottom:1.5rem;">
+        <input id="venue-search" type="text" placeholder="Search by name or room ID…" oninput="renderVenueCards()" style="flex:1;background:#111213;border:1px solid #2a2b2d;color:var(--paper);padding:.65rem 1rem;font-family:'DM Mono',monospace;font-size:.8rem;outline:none;" onfocus="this.style.borderColor='var(--accent)'" onblur="this.style.borderColor='#2a2b2d'">
+        <div style="background:#1a1b1d;border:1px solid #2a2b2d;border-left:none;padding:0 1rem;display:flex;align-items:center;font-size:.7rem;color:#444;">🔍</div>
+      </div>
+      <div id="venue-cards" style="display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:#1a1b1d;margin-bottom:2rem;"></div>
+      <div id="venue-empty" style="display:none;padding:3rem;text-align:center;background:#111213;border:1px solid #1a1b1d;margin-bottom:2rem;">
+        <div style="font-size:2rem;margin-bottom:.75rem;">🏪</div>
+        <div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:1rem;text-transform:uppercase;color:#444;margin-bottom:.4rem;">No rooms yet</div>
+        <div style="font-family:'DM Mono',monospace;font-size:.65rem;color:#333;letter-spacing:.06em;">Click "+ Allocate new room" to get started</div>
+      </div>
+    </div>
+
+    <!-- NEW/EDIT VENUE PANEL -->
+    <div id="new-venue-panel" style="display:none;background:#111213;border:1px solid #333;padding:2rem;margin-bottom:2rem;">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1.5rem;">
+        <div>
+          <div style="font-family:'DM Mono',monospace;font-size:.6rem;color:var(--accent);letter-spacing:.12em;text-transform:uppercase;margin-bottom:.2rem;" id="nvp-mode-label">// allocate new room</div>
+          <div style="font-family:'Barlow Condensed',sans-serif;font-weight:900;font-size:1.2rem;text-transform:uppercase;color:var(--paper);" id="nvp-title">New Room</div>
+        </div>
+        <button onclick="closeNewVenuePanel()" style="background:none;border:none;color:#555;cursor:pointer;font-size:1.2rem;">✕</button>
+      </div>
+      <div style="margin-bottom:1.25rem;">
+        <div style="font-family:'DM Mono',monospace;font-size:.6rem;color:#555;letter-spacing:.1em;text-transform:uppercase;margin-bottom:.6rem;">Venue type</div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;">
+          <button onclick="selectType('restaurant')" class="vtype-btn" data-type="restaurant">🍽 Restaurant</button>
+          <button onclick="selectType('cafe')"       class="vtype-btn" data-type="cafe">☕ Café</button>
+          <button onclick="selectType('shop')"       class="vtype-btn" data-type="shop">🛍 Shop</button>
+          <button onclick="selectType('govt')"       class="vtype-btn" data-type="govt">🏛 Govt/Office</button>
+          <button onclick="selectType('other')"      class="vtype-btn" data-type="other">📦 Other</button>
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1rem;">
+        <div class="cr-field"><label>Venue / Business name</label><input type="text" id="nvp-name" placeholder="e.g. The Grill House"></div>
+        <div class="cr-field"><label>Room ID (URL slug)</label><input type="text" id="nvp-slug" placeholder="e.g. grillhouse" oninput="previewSlug()"></div>
+        <div class="cr-field"><label>Location / Branch</label><input type="text" id="nvp-location" placeholder="e.g. Mall Level 2"></div>
+        <div class="cr-field"><label>Operating hours</label><input type="text" id="nvp-hours" placeholder="e.g. 10:00 – 22:00"></div>
+      </div>
+      <div style="background:#0d0e0f;border:1px solid #222;padding:.75rem 1rem;margin-bottom:1.25rem;display:flex;align-items:center;gap:.75rem;">
+        <span style="font-family:'DM Mono',monospace;font-size:.6rem;color:#444;text-transform:uppercase;letter-spacing:.08em;">Room URL:</span>
+        <span style="font-family:'DM Mono',monospace;font-size:.78rem;color:#aaa;">lineup.app/room/</span><span id="slug-preview" style="font-family:'DM Mono',monospace;font-size:.78rem;color:var(--accent);">your-room-id</span>
+        <span id="slug-conflict" style="font-family:'DM Mono',monospace;font-size:.6rem;color:var(--red);display:none;">⚠ ID already taken</span>
+      </div>
+      <div style="font-family:'DM Mono',monospace;font-size:.6rem;color:#555;letter-spacing:.1em;text-transform:uppercase;margin-bottom:.6rem;">Service counters <span style="color:#333;">(2–6)</span></div>
+      <div id="counter-inputs" style="margin-bottom:1rem;"></div>
+      <div style="display:flex;gap:.75rem;margin-bottom:1.5rem;">
+        <button onclick="addCounterInput()" style="font-family:'DM Mono',monospace;font-size:.65rem;letter-spacing:.06em;text-transform:uppercase;padding:.5rem 1rem;background:transparent;border:1px solid #333;color:#666;cursor:pointer;" onmouseover="this.style.color='#aaa';this.style.borderColor='#555'" onmouseout="this.style.color='#666';this.style.borderColor='#333'">+ Add counter</button>
+        <button onclick="removeCounterInput()" style="font-family:'DM Mono',monospace;font-size:.65rem;letter-spacing:.06em;text-transform:uppercase;padding:.5rem 1rem;background:transparent;border:1px solid #2a2b2d;color:#444;cursor:pointer;">− Remove last</button>
+      </div>
+      <div style="display:flex;gap:1rem;align-items:center;">
+        <button onclick="saveVenue()" style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:.95rem;letter-spacing:.1em;text-transform:uppercase;padding:.8rem 2rem;background:var(--accent);color:#fff;border:none;cursor:pointer;" id="nvp-save-btn">Allocate room →</button>
+        <button onclick="closeNewVenuePanel()" style="font-family:'DM Mono',monospace;font-size:.68rem;letter-spacing:.06em;text-transform:uppercase;padding:.8rem 1.25rem;background:transparent;border:1px solid #333;color:#666;cursor:pointer;">Cancel</button>
+        <span id="nvp-err" style="font-family:'DM Mono',monospace;font-size:.65rem;color:var(--red);display:none;"></span>
+      </div>
+    </div>
+
+    <!-- LIVE STATS -->
+    <div class="dash-stats">
+      <div class="dash-stat"><div class="dash-stat-num" id="ds-total">0</div><div class="dash-stat-label">Total tokens issued</div></div>
+      <div class="dash-stat"><div class="dash-stat-num" id="ds-waiting">0</div><div class="dash-stat-label">Currently waiting</div></div>
+      <div class="dash-stat"><div class="dash-stat-num" id="ds-served">0</div><div class="dash-stat-label">Served today</div></div>
+      <div class="dash-stat"><div class="dash-stat-num" id="ds-avgwait">—</div><div class="dash-stat-label">Avg wait (mins)</div></div>
+    </div>
+    <div class="dash-counters" id="dash-counters"></div>
+    <div style="font-family:'DM Mono',monospace;font-size:.65rem;color:var(--accent);letter-spacing:.1em;text-transform:uppercase;margin-bottom:1rem;">// queue · all tokens</div>
+    <div style="background:#111213;border:1px solid #222;overflow-x:auto;">
+      <table class="token-queue-table">
+        <thead><tr><th>Token</th><th>Room</th><th>Counter</th><th>Joined</th><th>Wait</th><th>Status</th><th>Action</th></tr></thead>
+        <tbody id="queue-table-body"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- HERO -->
+<section class="hero">
+  <div class="hero-left">
+    <div class="hero-eyebrow"><span class="live-dot"></span>Real-time queue intelligence</div>
+    <h1 class="hero-title">Stop<br>Picking<br>The <span class="accent">Wrong</span><br>Line.</h1>
+    <p class="hero-sub">Lineup is a zero-login web app where people at the same venue crowdsource real wait times — live. You get a token. You get notified when it's your turn.</p>
+    <div class="hero-buttons">
+      <a class="btn-primary" onclick="goTo('join')" style="cursor:pointer;">Join a room →</a>
+      <a class="btn-ghost"   onclick="goTo('how')"  style="cursor:pointer;">How it works</a>
+    </div>
+  </div>
+  <div class="hero-right">
+    <p class="mockup-label">// live room · cafeteria b1</p>
+    <div class="mockup-phone">
+      <div class="phone-status">
+        <span class="phone-venue">lineup.app/room/cafb1</span>
+        <span class="phone-live"><span class="phone-live-dot"></span>14 active</span>
+      </div>
+      <div class="phone-token-strip">
+        <div><div class="pt-label">Your token</div><div class="pt-num">#042</div></div>
+        <div style="text-align:right;"><div class="pt-label">Position</div><div style="font-family:'DM Mono',monospace;font-size:.6rem;color:#888;">3rd in line · A</div></div>
+      </div>
+      <p class="phone-heading">All counters</p>
+      <div class="counter-list">
+        <div class="counter-row best"><span class="counter-num">A</span><span class="counter-name">Hot Food</span><span class="counter-people">3 👤</span><div class="counter-bar-wrap"><div class="counter-bar bar-green" style="width:22%"></div></div><span class="counter-time time-green">~4m</span><span class="best-badge">best</span></div>
+        <div class="counter-row"><span class="counter-num">B</span><span class="counter-name">Sandwiches</span><span class="counter-people">8 👤</span><div class="counter-bar-wrap"><div class="counter-bar bar-amber" style="width:55%"></div></div><span class="counter-time time-amber">~9m</span></div>
+        <div class="counter-row"><span class="counter-num">C</span><span class="counter-name">Grill Station</span><span class="counter-people">13 👤</span><div class="counter-bar-wrap"><div class="counter-bar bar-red" style="width:88%"></div></div><span class="counter-time time-red">~14m</span></div>
+        <div class="counter-row"><span class="counter-num">D</span><span class="counter-name">Salad Bar</span><span class="counter-people">6 👤</span><div class="counter-bar-wrap"><div class="counter-bar bar-amber" style="width:40%"></div></div><span class="counter-time time-amber">~7m</span></div>
+      </div>
+      <button class="phone-join-btn">You are in line · A · #042</button>
+    </div>
+  </div>
+</section>
+
+<!-- TICKER -->
+<div class="ticker">
+  <div class="ticker-track">
+    <span class="ticker-item">Get a token instantly</span><span class="ticker-sep">///</span>
+    <span class="ticker-item">See people ahead in each line</span><span class="ticker-sep">///</span>
+    <span class="ticker-item">Browser notification when served</span><span class="ticker-sep">///</span>
+    <span class="ticker-item">Powered by Supabase Realtime</span><span class="ticker-sep">///</span>
+    <span class="ticker-item">Live across all devices</span><span class="ticker-sep">///</span>
+    <span class="ticker-item">No login · no install</span><span class="ticker-sep">///</span>
+    <span class="ticker-item">Get a token instantly</span><span class="ticker-sep">///</span>
+    <span class="ticker-item">See people ahead in each line</span><span class="ticker-sep">///</span>
+    <span class="ticker-item">Browser notification when served</span><span class="ticker-sep">///</span>
+    <span class="ticker-item">Powered by Supabase Realtime</span><span class="ticker-sep">///</span>
+    <span class="ticker-item">Live across all devices</span><span class="ticker-sep">///</span>
+    <span class="ticker-item">No login · no install</span><span class="ticker-sep">///</span>
+  </div>
+</div>
+
+<!-- JOIN A ROOM -->
+<section class="section-join" id="join">
+  <div class="join-top">
+    <div class="join-left">
+      <div class="join-label">// 01 · join a room</div>
+      <h2 class="join-title">Enter a<br><span class="accent">Live Room</span><br>instantly.</h2>
+      <p class="join-desc">Type the venue's room ID or paste the link. You'll be assigned a token and can see every counter's live wait time and queue depth — synced in real-time across all devices.</p>
+      <div class="join-form">
+        <input class="join-input" type="text" id="room-input" placeholder="Room ID — e.g. cafb1" oninput="checkRoomInput()">
+        <button class="join-btn" onclick="joinRoom()">Join →</button>
+      </div>
+      <div class="join-url-hint">or visit <span>lineup.app/room/<span id="hint-slug">your-room-id</span></span></div>
+      <div id="join-feedback" style="font-family:'DM Mono',monospace;font-size:.68rem;margin-top:1rem;color:#555;display:none;"></div>
+    </div>
+    <div class="join-right">
+      <div class="join-stats-title">// what you get when you join</div>
+      <div class="join-stats-grid">
+        <div class="join-stat"><div class="js-num" id="live-tokens">—</div><div class="js-label">Tokens issued today</div></div>
+        <div class="join-stat"><div class="js-num" id="live-waiting">—</div><div class="js-label">Currently in queue</div></div>
+        <div class="join-stat"><div class="js-num">~<span id="live-avg">—</span><span style="font-size:1.1rem">m</span></div><div class="js-label">Fastest counter now</div></div>
+        <div class="join-stat"><div class="js-num" id="live-rooms">—</div><div class="js-label">Active rooms</div></div>
+      </div>
+      <div class="join-features">
+        <div class="jf-row"><div class="jf-icon">🎟️</div><div class="jf-text"><strong>Instant token</strong> — assigned the moment you join. Persists in the database.</div></div>
+        <div class="jf-row"><div class="jf-icon">👥</div><div class="jf-text"><strong>People ahead</strong> — exact queue depth per counter, live from Supabase.</div></div>
+        <div class="jf-row"><div class="jf-icon">🔔</div><div class="jf-text"><strong>Push notification</strong> — browser alert fires the moment the owner marks your token served.</div></div>
+        <div class="jf-row"><div class="jf-icon">📡</div><div class="jf-text"><strong>Realtime sync</strong> — WebSocket subscription; all screens update in under 2 seconds.</div></div>
+        <div class="jf-row"><div class="jf-icon">🚫</div><div class="jf-text"><strong>Zero friction</strong> — no account, no app. Just open the link.</div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- LIVE ROOM VIEW -->
+  <div id="live-room-view" style="display:none;">
+    <div id="lrv-header" style="border-top:1px solid #1a6b3c;background:#060e08;padding:1.5rem 3.5rem;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:1rem;">
+      <div style="display:flex;align-items:center;gap:1.5rem;">
+        <div>
+          <div style="font-family:'DM Mono',monospace;font-size:.6rem;color:#4caf50;letter-spacing:.12em;text-transform:uppercase;">// live room</div>
+          <div id="lrv-room-name" style="font-family:'Barlow Condensed',sans-serif;font-weight:900;font-size:1.6rem;text-transform:uppercase;color:#fff;line-height:1.1;margin-top:.1rem;">—</div>
+        </div>
+        <div style="width:1px;height:36px;background:#1a6b3c;"></div>
+        <div style="display:flex;gap:2rem;">
+          <div><div style="font-family:'DM Mono',monospace;font-size:.58rem;color:#4caf50;text-transform:uppercase;letter-spacing:.08em;">Your token</div><div id="lrv-my-token" style="font-family:'Barlow Condensed',sans-serif;font-weight:900;font-size:1.4rem;color:#fff;">—</div></div>
+          <div><div style="font-family:'DM Mono',monospace;font-size:.58rem;color:#4caf50;text-transform:uppercase;letter-spacing:.08em;">Counter</div><div id="lrv-my-counter" style="font-family:'DM Mono',monospace;font-size:.82rem;color:#aaa;margin-top:2px;">—</div></div>
+          <div><div style="font-family:'DM Mono',monospace;font-size:.58rem;color:#4caf50;text-transform:uppercase;letter-spacing:.08em;">Ahead of you</div><div id="lrv-ahead" style="font-family:'Barlow Condensed',sans-serif;font-weight:900;font-size:1.4rem;color:var(--amber);">—</div></div>
+          <div><div style="font-family:'DM Mono',monospace;font-size:.58rem;color:#4caf50;text-transform:uppercase;letter-spacing:.08em;">Est. wait</div><div id="lrv-est-wait" style="font-family:'Barlow Condensed',sans-serif;font-weight:900;font-size:1.4rem;color:#fff;">—</div></div>
+        </div>
+      </div>
+      <div style="display:flex;gap:.75rem;align-items:center;flex-wrap:wrap;">
+        <div style="display:flex;align-items:center;gap:6px;font-family:'DM Mono',monospace;font-size:.6rem;color:#4caf50;letter-spacing:.08em;text-transform:uppercase;background:#0d1f14;border:1px solid #1a6b3c;padding:.35rem .8rem;">
+          <span style="width:6px;height:6px;border-radius:50%;background:#4caf50;animation:pulse 1.4s infinite;display:inline-block;"></span>
+          <span id="lrv-active-count">0</span> active
+        </div>
+        <button onclick="switchCounter()" style="font-family:'DM Mono',monospace;font-size:.65rem;letter-spacing:.06em;text-transform:uppercase;padding:.4rem 1rem;background:transparent;border:1px solid #333;color:#888;cursor:pointer;" onmouseover="this.style.color='#fff';this.style.borderColor='#666'" onmouseout="this.style.color='#888';this.style.borderColor='#333'">⇄ Switch counter</button>
+        <button onclick="leaveQueue()" style="font-family:'DM Mono',monospace;font-size:.65rem;letter-spacing:.06em;text-transform:uppercase;padding:.4rem 1rem;background:transparent;border:1px solid #5a1a1a;color:#c44;cursor:pointer;" onmouseover="this.style.background='#1a0808'" onmouseout="this.style.background='transparent'">✕ Leave</button>
+      </div>
+    </div>
+    <div style="background:#0d0e0f;border-top:1px solid #1a1b1d;border-bottom:1px solid #1a1b1d;padding:0 3.5rem;display:flex;align-items:center;gap:0;overflow-x:auto;">
+      <button onclick="setLiveTab('overview')" id="tab-overview" class="lrv-tab lrv-tab-active">Overview</button>
+      <button onclick="setLiveTab('myline')"   id="tab-myline"   class="lrv-tab">My Line</button>
+      <button onclick="setLiveTab('browse')"   id="tab-browse"   class="lrv-tab">Browse All Lines</button>
+      <button onclick="setLiveTab('queue')"    id="tab-queue"    class="lrv-tab">Queue List</button>
+    </div>
+    <div id="lrv-tab-overview" style="background:#0d0e0f;padding:2.5rem 3.5rem;"><div id="lrv-overview-counters" style="display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:#1a1b1d;"></div></div>
+    <div id="lrv-tab-myline"   style="display:none;background:#0d0e0f;padding:2.5rem 3.5rem;">
+      <div style="display:grid;grid-template-columns:2fr 1fr;gap:2rem;">
+        <div>
+          <div style="font-family:'DM Mono',monospace;font-size:.62rem;color:var(--accent);letter-spacing:.12em;text-transform:uppercase;margin-bottom:1.5rem;">// your position</div>
+          <div id="lrv-myline-visual" style="background:#111213;border:1px solid #1a6b3c;padding:2rem;margin-bottom:1.5rem;"></div>
+        </div>
+        <div>
+          <div style="font-family:'DM Mono',monospace;font-size:.62rem;color:var(--accent);letter-spacing:.12em;text-transform:uppercase;margin-bottom:1.5rem;">// counter stats</div>
+          <div id="lrv-myline-stats" style="background:#111213;border:1px solid #222;padding:1.5rem;"></div>
+          <div style="margin-top:1rem;display:flex;flex-direction:column;gap:.75rem;" id="lrv-myline-actions"></div>
+        </div>
+      </div>
+    </div>
+    <div id="lrv-tab-browse" style="display:none;background:#0d0e0f;padding:2.5rem 3.5rem;">
+      <div style="font-family:'DM Mono',monospace;font-size:.62rem;color:var(--accent);letter-spacing:.12em;text-transform:uppercase;margin-bottom:1.5rem;">// all counters · tap to switch</div>
+      <div id="lrv-browse-counters" style="display:flex;flex-direction:column;gap:1px;background:#1a1b1d;border:1px solid #1a1b1d;"></div>
+    </div>
+    <div id="lrv-tab-queue" style="display:none;background:#0d0e0f;padding:2.5rem 3.5rem;">
+      <div style="font-family:'DM Mono',monospace;font-size:.62rem;color:var(--accent);letter-spacing:.12em;text-transform:uppercase;margin-bottom:1.5rem;">// token queue · your counter</div>
+      <div style="overflow-x:auto;border:1px solid #1a1b1d;">
+        <table style="width:100%;border-collapse:collapse;" id="lrv-queue-table">
+          <thead><tr style="border-bottom:1px solid #1e1f21;">
+            <th style="font-family:'DM Mono',monospace;font-size:.58rem;color:#444;letter-spacing:.1em;text-transform:uppercase;padding:.75rem 1.25rem;text-align:left;">Pos</th>
+            <th style="font-family:'DM Mono',monospace;font-size:.58rem;color:#444;letter-spacing:.1em;text-transform:uppercase;padding:.75rem 1.25rem;text-align:left;">Token</th>
+            <th style="font-family:'DM Mono',monospace;font-size:.58rem;color:#444;letter-spacing:.1em;text-transform:uppercase;padding:.75rem 1.25rem;text-align:left;">Joined</th>
+            <th style="font-family:'DM Mono',monospace;font-size:.58rem;color:#444;letter-spacing:.1em;text-transform:uppercase;padding:.75rem 1.25rem;text-align:left;">Waiting</th>
+            <th style="font-family:'DM Mono',monospace;font-size:.58rem;color:#444;letter-spacing:.1em;text-transform:uppercase;padding:.75rem 1.25rem;text-align:left;">Status</th>
+          </tr></thead>
+          <tbody id="lrv-queue-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- HOW IT WORKS -->
+<section class="section-how" id="how">
+  <div class="how-header">
+    <div>
+      <div style="font-family:'DM Mono',monospace;font-size:.65rem;color:var(--muted);letter-spacing:.1em;text-transform:uppercase;margin-bottom:.75rem;">// 02</div>
+      <h2 class="how-title">How it<br><span class="accent">Works</span></h2>
+    </div>
+    <p class="how-sub">Four steps. No account. No app. Just a URL and collective intelligence.</p>
+  </div>
+  <div class="steps-grid">
+    <div class="step"><div class="step-num">// step 01</div><div class="step-icon">📲</div><h3>Scan & Enter</h3><p>Scan the QR or visit the URL. You're in instantly — no sign-up.</p><div class="step-arrow">→</div></div>
+    <div class="step"><div class="step-num">// step 02</div><div class="step-icon">🎟️</div><h3>Get your token</h3><p>Pick a counter. A token is instantly assigned and saved to the database.</p><div class="step-arrow">→</div></div>
+    <div class="step"><div class="step-num">// step 03</div><div class="step-icon">👀</div><h3>Watch live data</h3><p>See queue depth, people ahead, and rolling wait times update in real-time via WebSocket.</p><div class="step-arrow">→</div></div>
+    <div class="step"><div class="step-num">// step 04</div><div class="step-icon">🔔</div><h3>Get notified</h3><p>When the owner marks your token served, a browser notification fires — even in the background.</p></div>
+  </div>
+  <div class="formula-strip" style="margin-left:-3.5rem;margin-right:-3.5rem;padding-left:3.5rem;padding-right:3.5rem;">
+    <span class="formula-label">// the math</span>
+    <span class="formula"><span class="var">wait_time</span><span class="eq">=</span><span class="var">served_at</span><span class="op">−</span><span class="var">joined_at</span></span>
+    <span style="color:#ccc;font-family:'DM Mono',monospace;font-size:.8rem;">→</span>
+    <span class="formula"><span class="var">display_avg</span><span class="eq">=</span>rolling 20-min average of all completions per counter</span>
+  </div>
+</section>
+
+<!-- USE CASES -->
+<section class="section-usecases" id="usecases">
+  <div style="font-family:'DM Mono',monospace;font-size:.65rem;color:var(--muted);letter-spacing:.1em;text-transform:uppercase;margin-bottom:.5rem;">// 03</div>
+  <h2 class="uc-title">Built for<br>any queue</h2>
+  <p class="uc-sub">Anywhere people wait in parallel lines, Lineup works.</p>
+  <div class="uc-grid">
+    <div class="uc-card"><div class="uc-icon">🎓</div><h3>Student Cafeterias</h3><p>5-minute lunch breaks are ruined by the wrong counter. Help students eat, not wait.</p></div>
+    <div class="uc-card"><div class="uc-icon">🏛️</div><h3>Government Offices</h3><p>Multi-counter DMVs, passport offices, benefits centers. Help citizens navigate without guessing.</p></div>
+    <div class="uc-card"><div class="uc-icon">🖥️</div><h3>Tech Support Hubs</h3><p>Corporate IT floors and campus support centers. Route staff to the fastest available desk.</p></div>
+    <div class="uc-card"><div class="uc-icon">🍔</div><h3>Food Truck Festivals</h3><p>Six trucks, no time. Visitors make smarter choices, operators get better flow.</p></div>
+  </div>
+</section>
+
+<section class="section-stats">
+  <div class="stat-item"><div class="stat-num">0</div><div class="stat-label">Accounts required to use Lineup</div></div>
+  <div class="stat-item"><div class="stat-num">20<span style="font-size:1.5rem">m</span></div><div class="stat-label">Rolling average window for live accuracy</div></div>
+  <div class="stat-item"><div class="stat-num">&lt;2s</div><div class="stat-label">Live update latency via WebSockets</div></div>
+  <div class="stat-item"><div class="stat-num">∞</div><div class="stat-label">Venues supported with a unique room ID</div></div>
+</section>
+
+<footer>
+  <div class="footer-logo">Line<span>up</span></div>
+  <div class="footer-note">Real-time · Supabase · Crowd-powered</div>
+  <div class="footer-note">© 2025 Lineup</div>
+</footer>
+
+<!-- SWITCH COUNTER MODAL -->
+<div id="switch-modal">
+  <div class="switch-modal-box">
+    <button onclick="closeSwitchModal()" style="position:absolute;top:1rem;right:1rem;background:none;border:none;color:#555;cursor:pointer;font-size:1.1rem;">✕</button>
+    <div style="font-family:'Barlow Condensed',sans-serif;font-weight:900;font-size:1.3rem;text-transform:uppercase;color:var(--paper);margin-bottom:.3rem;">Switch Counter</div>
+    <div style="font-family:'DM Mono',monospace;font-size:.6rem;color:#555;letter-spacing:.08em;text-transform:uppercase;margin-bottom:1.5rem;">// you'll get a new token at the chosen counter</div>
+    <div id="switch-options" style="display:flex;flex-direction:column;gap:1px;background:#222;"></div>
+  </div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════
+// SUPABASE INIT
+// ═══════════════════════════════════════════
+const SUPABASE_URL  = 'https://rgvyeimawlpbtybjdcxp.supabase.co';
+const SUPABASE_KEY  = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJndnllaW1hd2xwYnR5YmpkY3hwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg5NDQ0MzgsImV4cCI6MjA5NDUyMDQzOH0.IVc7gSxYOJDsR3xVmoMcA0EXbptNHQlSJazttPTkYVw';
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+// ═══════════════════════════════════════════
+// STATE
+// ═══════════════════════════════════════════
+const OWNER_CREDS = { user: 'owner', pass: 'mexico' };
+let myToken       = null;  // token string e.g. "042"
+let myTokenId     = null;  // DB row id
+let myCounterId   = null;  // e.g. "A"
+let myRoomSlug    = null;
+let notifEnabled  = false;
+let currentRoomSlug = null;
+let activeTab     = 'overview';
+let venueFilter   = 'all';
+let selectedType  = 'restaurant';
+let counterCount  = 2;
+let editingSlug   = null;
+
+// local cache
+let roomsCache    = {};   // slug -> room obj
+let countersCache = {};   // slug -> [counter]
+let tokensCache   = {};   // slug -> [token]
+
+const VENUE_TYPES = {
+  restaurant:{ label:'Restaurant', emoji:'🍽', color:'#c47a2a', bg:'#1a0f05' },
+  cafe:      { label:'Café',       emoji:'☕', color:'#8a6a3a', bg:'#150f08' },
+  shop:      { label:'Shop',       emoji:'🛍', color:'#2a6a8a', bg:'#051520' },
+  govt:      { label:'Govt/Office',emoji:'🏛', color:'#5a5a8a', bg:'#0d0d18' },
+  other:     { label:'Other',      emoji:'📦', color:'#6a6a6a', bg:'#111'    },
+};
+const COUNTER_DEFAULTS = {
+  restaurant:['Main Counter','Takeaway','Bar','Grill','Desserts','Drinks'],
+  cafe:      ['Order Here','Pickup','Drive-Through','Cold Drinks','Hot Drinks','Pastries'],
+  shop:      ['Checkout 1','Checkout 2','Returns','Customer Service','Fitting Room','Info Desk'],
+  govt:      ['Counter A','Counter B','Counter C','Counter D','Counter E','Counter F'],
+  other:     ['Counter 1','Counter 2','Counter 3','Counter 4','Counter 5','Counter 6'],
+};
+
+// ═══════════════════════════════════════════
+// DB HELPERS
+// ═══════════════════════════════════════════
+async function loadRooms(){
+  const { data } = await sb.from('rooms').select('*');
+  roomsCache = {};
+  (data||[]).forEach(r => roomsCache[r.slug] = r);
+}
+
+async function loadCounters(slug){
+  const { data } = await sb.from('counters').select('*').eq('room_slug', slug);
+  countersCache[slug] = data || [];
+  return countersCache[slug];
+}
+
+async function loadTokens(slug){
+  const { data } = await sb.from('tokens').select('*').eq('room_slug', slug).order('joined_at', { ascending: true });
+  tokensCache[slug] = data || [];
+  return tokensCache[slug];
+}
+
+async function loadAll(){
+  await loadRooms();
+  await Promise.all(Object.keys(roomsCache).map(async slug => {
+    await loadCounters(slug);
+    await loadTokens(slug);
+  }));
+}
+
+// ═══════════════════════════════════════════
+// REALTIME SUBSCRIPTIONS
+// ═══════════════════════════════════════════
+function subscribeRealtime(){
+  sb.channel('lineup-live')
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'tokens' }, async payload => {
+      const slug = payload.new?.room_slug || payload.old?.room_slug;
+      if(slug){
+        await loadTokens(slug);
+        onTokensChanged(slug, payload);
+      }
+    })
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'rooms' }, async () => {
+      await loadRooms();
+      updateLiveStats();
+      if(document.getElementById('owner-dashboard').classList.contains('show')) renderVenueCards();
+    })
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'counters' }, async payload => {
+      const slug = payload.new?.room_slug || payload.old?.room_slug;
+      if(slug) await loadCounters(slug);
+      updateLiveStats();
+    })
+    .subscribe(status => {
+      const dot   = document.getElementById('db-dot');
+      const label = document.getElementById('db-label');
+      if(status === 'SUBSCRIBED'){
+        dot.className='db-dot connected'; label.textContent='live';
+      } else if(status === 'CLOSED' || status === 'CHANNEL_ERROR'){
+        dot.className='db-dot disconnected'; label.textContent='offline';
+      }
+    });
+}
+
+function onTokensChanged(slug, payload){
+  // Check if MY token was just served
+  if(myTokenId && payload.new?.id === myTokenId && payload.new?.status === 'served'){
+    fireServedNotification(myToken, myCounterId);
+  }
+  updateBanner();
+  if(currentRoomSlug === slug) renderActiveTab();
+  updateLiveStats();
+  if(document.getElementById('owner-dashboard').classList.contains('show')) renderDashboard();
+}
+
+// ═══════════════════════════════════════════
+// INIT
+// ═══════════════════════════════════════════
+async function init(){
+  setDbStatus('connecting');
+  try {
+    await loadAll();
+    subscribeRealtime();
+    updateLiveStats();
+    setDbStatus('connected');
+  } catch(e){
+    setDbStatus('disconnected');
+    showToast('⚠ DB error', 'Could not connect to Supabase.');
+  }
+}
+
+function setDbStatus(s){
+  const dot   = document.getElementById('db-dot');
+  const label = document.getElementById('db-label');
+  if(s==='connected'){ dot.className='db-dot connected'; label.textContent='live'; }
+  else if(s==='disconnected'){ dot.className='db-dot disconnected'; label.textContent='offline'; }
+  else { dot.className='db-dot connecting'; label.textContent='connecting'; }
+}
+
+// ═══════════════════════════════════════════
+// UTILS
+// ═══════════════════════════════════════════
+function goTo(id){ const el=document.getElementById(id); if(!el)return; const banH=document.getElementById('token-banner').classList.contains('show')?40:0; window.scrollTo({top:el.getBoundingClientRect().top+window.scrollY-56-banH-8,behavior:'smooth'}); }
+function showToast(title, body){ document.getElementById('toast-title').textContent=title; document.getElementById('toast-body').textContent=body; const t=document.getElementById('toast'); t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),5500); }
+function closeToast(){ document.getElementById('toast').classList.remove('show'); }
+
+function updateLiveStats(){
+  let total=0, waiting=0, minAvg=Infinity;
+  Object.values(tokensCache).forEach(arr=>{ total+=arr.length; waiting+=arr.filter(t=>t.status==='waiting').length; });
+  Object.values(countersCache).forEach(arr=>arr.forEach(c=>{ if(c.avg_wait<minAvg) minAvg=c.avg_wait; }));
+  document.getElementById('live-tokens').textContent  = total;
+  document.getElementById('live-waiting').textContent = waiting;
+  document.getElementById('live-rooms').textContent   = Object.keys(roomsCache).length;
+  document.getElementById('live-avg').textContent     = isFinite(minAvg) ? minAvg : '—';
+}
+
+// ═══════════════════════════════════════════
+// OWNER AUTH
+// ═══════════════════════════════════════════
+function openOwnerModal(){ document.getElementById('owner-overlay').classList.add('show'); document.getElementById('modal-err').classList.remove('show'); document.getElementById('owner-user').value=''; document.getElementById('owner-pass').value=''; setTimeout(()=>document.getElementById('owner-user').focus(),100); }
+function closeOwnerModal(){ document.getElementById('owner-overlay').classList.remove('show'); }
+function checkOwnerLogin(){
+  const u=document.getElementById('owner-user').value.trim();
+  const p=document.getElementById('owner-pass').value;
+  if(u===OWNER_CREDS.user && p===OWNER_CREDS.pass){ closeOwnerModal(); openOwnerDashboard(); }
+  else { document.getElementById('modal-err').classList.add('show'); document.getElementById('owner-pass').value=''; }
+}
+async function openOwnerDashboard(){
+  document.getElementById('owner-dashboard').classList.add('show');
+  await loadAll();
+  renderVenueCards();
+  renderDashboard();
+}
+function closeOwnerDashboard(){ document.getElementById('owner-dashboard').classList.remove('show'); }
+
+// ═══════════════════════════════════════════
+// DASHBOARD
+// ═══════════════════════════════════════════
+function renderDashboard(){
+  let total=0, waiting=0, served=0, totalWait=0, waitCount=0;
+  const allEntries=[];
+  Object.keys(roomsCache).forEach(slug=>{
+    const tokens = tokensCache[slug]||[];
+    tokens.forEach(t=>{
+      total++;
+      if(t.status==='waiting') waiting++;
+      if(t.status==='served'){ served++; if(t.served_at){ const w=(new Date(t.served_at)-new Date(t.joined_at))/60000; totalWait+=w; waitCount++; } }
+      const cInfo = (countersCache[slug]||[]).find(c=>c.counter_id===t.counter_id);
+      allEntries.push({...t, counterName: cInfo?.name||t.counter_id, roomSlug:slug});
+    });
+  });
+  document.getElementById('ds-total').textContent   = total;
+  document.getElementById('ds-waiting').textContent = waiting;
+  document.getElementById('ds-served').textContent  = served;
+  document.getElementById('ds-avgwait').textContent = waitCount>0?(totalWait/waitCount).toFixed(1):'—';
+
+  // Counter cards — show all rooms
+  const dcc = document.getElementById('dash-counters');
+  dcc.innerHTML = '';
+  Object.keys(roomsCache).forEach(slug=>{
+    (countersCache[slug]||[]).forEach(c=>{
+      const tokens = tokensCache[slug]||[];
+      const cWaiting = tokens.filter(t=>t.counter_id===c.counter_id&&t.status==='waiting');
+      const cServed  = tokens.filter(t=>t.counter_id===c.counter_id&&t.status==='served');
+      dcc.innerHTML += `<div class="dash-counter">
+        <div class="dc-header"><div class="dc-name">${c.counter_id} · ${c.name}</div><div style="font-family:'DM Mono',monospace;font-size:.6rem;color:#444;">${slug}</div></div>
+        <div class="dc-row"><span class="dc-row-label">Waiting</span><span class="dc-row-val">${cWaiting.length}</span></div>
+        <div class="dc-row"><span class="dc-row-label">Served</span><span class="dc-row-val">${cServed.length}</span></div>
+        <div class="dc-row"><span class="dc-row-label">Avg wait</span><span class="dc-row-val">~${c.avg_wait}m</span></div>
+        <div class="dc-row"><span class="dc-row-label">Next token</span><span class="dc-row-val">${cWaiting[0]?'#'+cWaiting[0].token:'—'}</span></div>
+      </div>`;
+    });
+  });
+
+  // Queue table
+  const tb = document.getElementById('queue-table-body');
+  tb.innerHTML = '';
+  allEntries.slice().reverse().slice(0,50).forEach(t=>{
+    const mins = ((Date.now()-new Date(t.joined_at))/60000).toFixed(1);
+    const statusCol = t.status==='waiting'?'color:var(--amber)':'color:var(--green)';
+    const action = t.status==='waiting'
+      ? `<button class="serve-btn" onclick="serveToken('${t.roomSlug}','${t.counter_id}','${t.token}',${t.id})">Mark served</button>`
+      : '<span style="color:#444;font-size:.65rem;">done</span>';
+    tb.innerHTML += `<tr>
+      <td style="color:var(--paper);font-weight:500;">#${t.token}</td>
+      <td>${t.roomSlug}</td>
+      <td>${t.counter_id} · ${t.counterName}</td>
+      <td>${new Date(t.joined_at).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})}</td>
+      <td>${mins}m</td>
+      <td style="${statusCol};text-transform:uppercase;letter-spacing:.06em;">${t.status}</td>
+      <td>${action}</td>
+    </tr>`;
+  });
+}
+
+async function serveToken(roomSlug, counterId, token, tokenId){
+  const { error } = await sb.from('tokens').update({ status:'served', served_at: new Date().toISOString() }).eq('id', tokenId);
+  if(error){ showToast('⚠ Error', error.message); return; }
+  await loadTokens(roomSlug);
+  renderDashboard();
+  renderActiveTab();
+  updateBanner();
+}
+
+async function simulateServe(){
+  // serve next waiting token across all rooms
+  for(const slug of Object.keys(tokensCache)){
+    const tokens = tokensCache[slug]||[];
+    const next = tokens.find(t=>t.status==='waiting');
+    if(next){ await serveToken(slug, next.counter_id, next.token, next.id); return; }
+  }
+  showToast('ℹ No tokens', 'No waiting tokens to serve.');
+}
+
+// ═══════════════════════════════════════════
+// VENUE MANAGEMENT
+// ═══════════════════════════════════════════
+function openNewVenuePanel(slugToEdit){
+  editingSlug = slugToEdit||null;
+  const panel = document.getElementById('new-venue-panel');
+  panel.style.display='block';
+  panel.scrollIntoView({behavior:'smooth',block:'nearest'});
+  if(editingSlug){
+    const r = roomsCache[editingSlug];
+    document.getElementById('nvp-mode-label').textContent='// editing room';
+    document.getElementById('nvp-title').textContent='Edit Room';
+    document.getElementById('nvp-save-btn').textContent='Save changes →';
+    document.getElementById('nvp-name').value=r.name;
+    document.getElementById('nvp-slug').value=r.slug;
+    document.getElementById('nvp-slug').disabled=true;
+    document.getElementById('nvp-location').value=r.location||'';
+    document.getElementById('nvp-hours').value=r.hours||'';
+    selectedType=r.type||'other';
+    selectType(selectedType,true);
+    const ctrs = countersCache[editingSlug]||[];
+    counterCount=ctrs.length||2;
+    buildCounterInputs(ctrs.map(c=>({name:c.name,avg:c.avg_wait})));
+    previewSlug();
+  } else {
+    document.getElementById('nvp-mode-label').textContent='// allocate new room';
+    document.getElementById('nvp-title').textContent='New Room';
+    document.getElementById('nvp-save-btn').textContent='Allocate room →';
+    document.getElementById('nvp-name').value='';
+    document.getElementById('nvp-slug').value='';
+    document.getElementById('nvp-slug').disabled=false;
+    document.getElementById('nvp-location').value='';
+    document.getElementById('nvp-hours').value='';
+    selectedType='restaurant';
+    selectType('restaurant',true);
+    counterCount=2;
+    buildCounterInputs();
+    document.getElementById('slug-preview').textContent='your-room-id';
+  }
+  document.getElementById('nvp-err').style.display='none';
+}
+function closeNewVenuePanel(){ document.getElementById('new-venue-panel').style.display='none'; editingSlug=null; }
+
+function selectType(type, silent){
+  selectedType=type;
+  document.querySelectorAll('.vtype-btn').forEach(b=>b.classList.toggle('selected',b.dataset.type===type));
+  if(!silent) buildCounterInputs();
+}
+
+function buildCounterInputs(existing){
+  const cont=document.getElementById('counter-inputs');
+  cont.innerHTML='';
+  const defaults=COUNTER_DEFAULTS[selectedType]||COUNTER_DEFAULTS.other;
+  for(let i=0;i<counterCount;i++){
+    const id=String.fromCharCode(65+i);
+    const name=existing?(existing[i]?.name||defaults[i]):defaults[i];
+    const avg=existing?(existing[i]?.avg||5):5;
+    cont.innerHTML+=`<div class="counter-inp-row">
+      <label>Counter ${id}</label>
+      <input type="text" id="ci-${i}" value="${name}" placeholder="${defaults[i]||'Counter '+id}">
+      <input type="number" id="ci-avg-${i}" value="${avg}" min="1" max="60" title="Avg wait (mins)" placeholder="~min" style="text-align:center;">
+    </div>`;
+  }
+}
+
+function addCounterInput(){ if(counterCount>=6)return; counterCount++; buildCounterInputs(getCurrentCounterData()); }
+function removeCounterInput(){ if(counterCount<=2)return; counterCount--; buildCounterInputs(getCurrentCounterData()); }
+function getCurrentCounterData(){
+  const d=[];
+  for(let i=0;i<counterCount+1;i++){
+    const n=document.getElementById('ci-'+i); const a=document.getElementById('ci-avg-'+i);
+    if(n) d.push({name:n.value, avg:parseInt(a?.value)||5});
+  }
+  return d;
+}
+
+function previewSlug(){
+  const raw=document.getElementById('nvp-slug').value.trim().toLowerCase().replace(/\s+/g,'-').replace(/[^a-z0-9-]/g,'');
+  document.getElementById('slug-preview').textContent=raw||'your-room-id';
+  document.getElementById('slug-conflict').style.display=(roomsCache[raw]&&raw!==editingSlug)?'inline':'none';
+}
+
+async function saveVenue(){
+  const name=document.getElementById('nvp-name').value.trim();
+  const slug=document.getElementById('nvp-slug').value.trim().toLowerCase().replace(/\s+/g,'-').replace(/[^a-z0-9-]/g,'');
+  const location=document.getElementById('nvp-location').value.trim();
+  const hours=document.getElementById('nvp-hours').value.trim();
+  const err=document.getElementById('nvp-err');
+
+  if(!name){ err.textContent='⚠ Venue name required'; err.style.display='inline'; return; }
+  if(!slug){ err.textContent='⚠ Room ID required'; err.style.display='inline'; return; }
+  if(roomsCache[slug]&&slug!==editingSlug){ err.textContent='⚠ Room ID already exists'; err.style.display='inline'; return; }
+  err.style.display='none';
+
+  document.getElementById('nvp-save-btn').textContent='Saving…';
+
+  try {
+    if(editingSlug){
+      await sb.from('rooms').update({name,type:selectedType,location,hours}).eq('slug',editingSlug);
+      // delete old counters and re-insert
+      await sb.from('counters').delete().eq('room_slug',editingSlug);
+    } else {
+      await sb.from('rooms').insert({slug,name,type:selectedType,location,hours});
+    }
+    const targetSlug = editingSlug||slug;
+    const counterRows=[];
+    for(let i=0;i<counterCount;i++){
+      const n=document.getElementById('ci-'+i)?.value.trim()||'Counter '+(i+1);
+      const a=parseInt(document.getElementById('ci-avg-'+i)?.value)||5;
+      counterRows.push({room_slug:targetSlug, counter_id:String.fromCharCode(65+i), name:n, avg_wait:a});
+    }
+    await sb.from('counters').insert(counterRows);
+    await loadRooms();
+    await loadCounters(targetSlug);
+    closeNewVenuePanel();
+    renderVenueCards();
+    renderDashboard();
+    updateLiveStats();
+    showToast(editingSlug?'✓ Room updated':'✓ Room allocated', `lineup.app/room/${targetSlug}`);
+  } catch(e){
+    err.textContent='⚠ '+e.message; err.style.display='inline';
+  }
+  document.getElementById('nvp-save-btn').textContent=editingSlug?'Save changes →':'Allocate room →';
+}
+
+function filterVenues(cat){
+  venueFilter=cat;
+  document.querySelectorAll('.vf-tab').forEach(b=>b.classList.remove('vf-active'));
+  document.getElementById('vf-'+cat)?.classList.add('vf-active');
+  renderVenueCards();
+}
+
+function renderVenueCards(){
+  const search=(document.getElementById('venue-search')?.value||'').toLowerCase();
+  const grid=document.getElementById('venue-cards');
+  const empty=document.getElementById('venue-empty');
+  const slugs=Object.keys(roomsCache).filter(slug=>{
+    const r=roomsCache[slug];
+    if(venueFilter!=='all'&&r.type!==venueFilter) return false;
+    if(search&&!r.name.toLowerCase().includes(search)&&!slug.includes(search)) return false;
+    return true;
+  });
+  if(slugs.length===0){ grid.style.display='none'; empty.style.display='block'; return; }
+  grid.style.display='grid'; empty.style.display='none';
+  grid.innerHTML='';
+  slugs.forEach(slug=>{
+    const r=roomsCache[slug];
+    const typeInfo=VENUE_TYPES[r.type]||VENUE_TYPES.other;
+    const tokens=tokensCache[slug]||[];
+    const waiting=tokens.filter(t=>t.status==='waiting').length;
+    const served=tokens.filter(t=>t.status==='served').length;
+    const ctrs=countersCache[slug]||[];
+    const fastest=ctrs.length?Math.min(...ctrs.map(c=>c.avg_wait)):0;
+    const statusColor=waiting>10?'var(--red)':waiting>4?'var(--amber)':'var(--green)';
+    grid.innerHTML+=`<div class="venue-card">
+      <div style="position:absolute;top:1rem;right:1rem;display:flex;align-items:center;gap:5px;">
+        <span style="width:6px;height:6px;border-radius:50%;background:${waiting>0?'var(--green)':'#333'};${waiting>0?'animation:pulse 2s infinite;':''}display:inline-block;"></span>
+        <span style="font-family:'DM Mono',monospace;font-size:.55rem;color:${waiting>0?'#4caf50':'#333'};text-transform:uppercase;letter-spacing:.06em;">${waiting>0?'live':'idle'}</span>
+      </div>
+      <div class="vc-type-badge" style="background:${typeInfo.bg};color:${typeInfo.color};border:1px solid ${typeInfo.color}33;">${typeInfo.emoji} ${typeInfo.label}</div>
+      <div style="font-family:'Barlow Condensed',sans-serif;font-weight:900;font-size:1.15rem;text-transform:uppercase;color:var(--paper);margin-bottom:.2rem;">${r.name}</div>
+      <div style="font-family:'DM Mono',monospace;font-size:.6rem;color:#555;margin-bottom:.1rem;">lineup.app/room/<span style="color:var(--accent)">${r.slug}</span></div>
+      ${r.location?`<div style="font-family:'DM Mono',monospace;font-size:.58rem;color:#444;margin-bottom:.1rem;">📍 ${r.location}</div>`:''}
+      ${r.hours?`<div style="font-family:'DM Mono',monospace;font-size:.58rem;color:#444;margin-bottom:.75rem;">🕐 ${r.hours}</div>`:'<div style="margin-bottom:.75rem;"></div>'}
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:#1a1b1d;margin-bottom:1rem;">
+        ${[['waiting',waiting,statusColor],['served',served,'var(--green)'],['counters',ctrs.length,'#aaa'],['fastest','~'+fastest+'m','#aaa']].map(([l,v,c])=>`
+        <div style="background:#0d0e0f;padding:.6rem .5rem;text-align:center;">
+          <div style="font-family:'Barlow Condensed',sans-serif;font-weight:900;font-size:1.2rem;color:${c};">${v}</div>
+          <div style="font-family:'DM Mono',monospace;font-size:.5rem;color:#444;text-transform:uppercase;letter-spacing:.04em;">${l}</div>
+        </div>`).join('')}
+      </div>
+      <div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:1rem;">
+        ${ctrs.map(c=>{ const cw=(tokensCache[slug]||[]).filter(t=>t.counter_id===c.counter_id&&t.status==='waiting').length; const cc=cw>5?'var(--red)':cw>2?'var(--amber)':'var(--green)'; return `<span style="font-family:'DM Mono',monospace;font-size:.55rem;background:#1a1b1d;border:1px solid #222;color:${cc};padding:2px 8px;">${c.counter_id}·${c.name}·${cw}</span>`; }).join('')}
+      </div>
+      <div class="vc-actions">
+        <button class="vc-btn vc-edit" onclick="openNewVenuePanel('${slug}')">✏ Edit</button>
+        <button class="vc-btn vc-copy" onclick="copyRoomLink('${slug}')">🔗 Copy link</button>
+        <button class="vc-btn vc-delete" onclick="deleteRoom('${slug}')">🗑 Delete</button>
+      </div>
+    </div>`;
+  });
+}
+
+function copyRoomLink(slug){ const url=`lineup.app/room/${slug}`; if(navigator.clipboard) navigator.clipboard.writeText(url).then(()=>showToast('🔗 Copied!',url)); else showToast('🔗 Link',url); }
+
+async function deleteRoom(slug){
+  if(!confirm(`Delete room "${slug}"? All queue data will be lost.`)) return;
+  await sb.from('rooms').delete().eq('slug',slug);
+  await loadRooms();
+  delete countersCache[slug];
+  delete tokensCache[slug];
+  renderVenueCards();
+  renderDashboard();
+  updateLiveStats();
+  showToast('🗑 Room deleted',`"${slug}" removed.`);
+}
+
+// ═══════════════════════════════════════════
+// JOIN ROOM
+// ═══════════════════════════════════════════
+function checkRoomInput(){ const v=document.getElementById('room-input').value.trim(); document.getElementById('hint-slug').textContent=v||'your-room-id'; }
+
+async function joinRoom(){
+  const raw=document.getElementById('room-input').value.trim().toLowerCase().replace(/.*\/room\//,'');
+  const fb=document.getElementById('join-feedback');
+  fb.style.display='block'; fb.style.color='#888'; fb.textContent='Looking up room…';
+
+  await loadRooms();
+  await loadCounters(raw);
+  await loadTokens(raw);
+
+  const room=roomsCache[raw];
+  if(!room){ fb.style.color='#c44'; fb.textContent=`✗ Room "${raw}" not found.`; return; }
+
+  const ctrs=countersCache[raw]||[];
+  if(!ctrs.length){ fb.style.color='#c44'; fb.textContent='This room has no counters configured yet.'; return; }
+
+  // pick counter with fewest waiting tokens
+  const tokens=tokensCache[raw]||[];
+  const best=ctrs.reduce((a,b)=>{
+    const aw=tokens.filter(t=>t.counter_id===a.counter_id&&t.status==='waiting').length;
+    const bw=tokens.filter(t=>t.counter_id===b.counter_id&&t.status==='waiting').length;
+    return aw<=bw?a:b;
+  });
+
+  // generate token number
+  const allTokenNums=(tokens.map(t=>parseInt(t.token))||[0]);
+  const nextNum=Math.max(0,...allTokenNums)+1;
+  const tokenStr=String(nextNum).padStart(3,'0');
+
+  const { data, error } = await sb.from('tokens').insert({
+    token: tokenStr, room_slug: raw, counter_id: best.counter_id, status:'waiting'
+  }).select().single();
+
+  if(error){ fb.style.color='#c44'; fb.textContent='⚠ Could not join: '+error.message; return; }
+
+  myToken=tokenStr; myTokenId=data.id; myCounterId=best.counter_id; myRoomSlug=raw; currentRoomSlug=raw;
+  await loadTokens(raw);
+
+  fb.style.color='#4caf50'; fb.textContent=`✓ Joined! Token #${tokenStr} · Counter ${best.counter_id} · ${best.name}`;
+  updateBanner();
+  activeTab='overview';
+  renderLiveRoom(raw);
+  setLiveTab('overview');
+  updateLiveStats();
+
+  if(Notification&&Notification.permission==='default') showToast('🔔 Enable notifications',`Allow alerts so we can notify you when #${tokenStr} is ready.`);
+}
+
+// ═══════════════════════════════════════════
+// BANNER
+// ═══════════════════════════════════════════
+function updateBanner(){
+  if(!myToken||!myCounterId||!myRoomSlug) return;
+  const tokens=tokensCache[myRoomSlug]||[];
+  const waiting=tokens.filter(t=>t.counter_id===myCounterId&&t.status==='waiting');
+  const myEntry=tokens.find(t=>t.token===myToken);
+  const myIdx=waiting.findIndex(t=>t.token===myToken);
+  const ahead=myIdx>0?myIdx:0;
+  const ctrs=countersCache[myRoomSlug]||[];
+  const ctr=ctrs.find(c=>c.counter_id===myCounterId);
+
+  document.getElementById('token-banner').classList.add('show');
+  document.getElementById('banner-token').textContent='#'+myToken;
+  document.getElementById('banner-counter').textContent=(myCounterId)+' · '+(ctr?.name||'');
+  if(myEntry&&myEntry.status==='served'){
+    document.getElementById('banner-ahead').textContent='✓';
+    document.getElementById('banner-ahead').style.color='var(--green)';
+    document.getElementById('banner-queue-pos').textContent='Your order is ready!';
+  } else {
+    document.getElementById('banner-ahead').textContent=ahead;
+    document.getElementById('banner-ahead').style.color=ahead===0?'var(--green)':ahead<5?'var(--amber)':'var(--red)';
+    document.getElementById('banner-queue-pos').textContent=`Position ${myIdx>=0?myIdx+1:'?'} of ${waiting.length} at ${myCounterId}`;
+  }
+}
+
+// ═══════════════════════════════════════════
+// LIVE ROOM TABS
+// ═══════════════════════════════════════════
+function setLiveTab(tab){
+  activeTab=tab;
+  ['overview','myline','browse','queue'].forEach(t=>{
+    document.getElementById('lrv-tab-'+t).style.display=t===tab?'block':'none';
+    document.getElementById('tab-'+t).classList.toggle('lrv-tab-active',t===tab);
+  });
+  renderActiveTab();
+}
+function renderActiveTab(){
+  if(activeTab==='overview') renderOverview();
+  else if(activeTab==='myline') renderMyLine();
+  else if(activeTab==='browse') renderBrowse();
+  else if(activeTab==='queue') renderQueueList();
+}
+
+function renderLiveRoom(slug){
+  if(!slug) slug=currentRoomSlug;
+  if(!slug) return;
+  currentRoomSlug=slug;
+  const room=roomsCache[slug]; if(!room) return;
+  document.getElementById('live-room-view').style.display='block';
+  document.getElementById('lrv-room-name').textContent=room.name;
+  const tokens=tokensCache[slug]||[];
+  const totalWaiting=tokens.filter(t=>t.status==='waiting').length;
+  document.getElementById('lrv-active-count').textContent=totalWaiting;
+
+  if(myToken&&myCounterId){
+    const ctrs=countersCache[slug]||[];
+    const ctr=ctrs.find(c=>c.counter_id===myCounterId);
+    const waiting=tokens.filter(t=>t.counter_id===myCounterId&&t.status==='waiting');
+    const myEntry=tokens.find(t=>t.token===myToken);
+    const myIdx=myEntry?waiting.findIndex(t=>t.token===myToken):-1;
+    const ahead=myIdx>0?myIdx:0;
+    document.getElementById('lrv-my-token').textContent='#'+myToken;
+    document.getElementById('lrv-my-counter').textContent=myCounterId+' · '+(ctr?.name||'');
+    if(myEntry&&myEntry.status==='served'){
+      document.getElementById('lrv-ahead').textContent='✓'; document.getElementById('lrv-ahead').style.color='var(--green)';
+      document.getElementById('lrv-est-wait').textContent='Ready!'; document.getElementById('lrv-est-wait').style.color='var(--green)';
+    } else {
+      document.getElementById('lrv-ahead').textContent=ahead;
+      document.getElementById('lrv-ahead').style.color=ahead===0?'var(--green)':ahead<5?'var(--amber)':'var(--red)';
+      document.getElementById('lrv-est-wait').textContent='~'+((ctr?.avg_wait||5)+ahead*(ctr?.avg_wait||5)*0.3).toFixed(0)+'m';
+      document.getElementById('lrv-est-wait').style.color='var(--paper)';
+    }
+  }
+  renderActiveTab();
+  goTo('live-room-view');
+}
+
+function renderOverview(){
+  const slug=currentRoomSlug; if(!slug) return;
+  const ctrs=countersCache[slug]||[];
+  const tokens=tokensCache[slug]||[];
+  const maxP=Math.max(...ctrs.map(c=>tokens.filter(t=>t.counter_id===c.counter_id&&t.status==='waiting').length),1);
+  const cont=document.getElementById('lrv-overview-counters');
+  cont.innerHTML='';
+  ctrs.forEach(c=>{
+    const waiting=tokens.filter(t=>t.counter_id===c.counter_id&&t.status==='waiting');
+    const pct=Math.round(waiting.length/maxP*100);
+    const col=pct<35?'var(--green)':pct<65?'var(--amber)':'var(--red)';
+    const isMine=myCounterId===c.counter_id;
+    const myEntry=isMine?tokens.find(t=>t.token===myToken):null;
+    const myIdx=isMine&&myEntry?waiting.findIndex(t=>t.token===myToken):-1;
+    cont.innerHTML+=`<div style="padding:2rem;background:${isMine?'#0a1a0d':'#111213'};border:1px solid ${isMine?'#1a6b3c':'transparent'};position:relative;">
+      ${isMine?`<div style="position:absolute;top:.75rem;right:.75rem;font-family:'DM Mono',monospace;font-size:.55rem;color:#4caf50;text-transform:uppercase;letter-spacing:.08em;background:#0d2010;padding:2px 8px;">your line</div>`:''}
+      <div style="font-family:'DM Mono',monospace;font-size:.58rem;color:${isMine?'#4caf50':'#444'};letter-spacing:.1em;text-transform:uppercase;margin-bottom:.4rem;">${c.counter_id}</div>
+      <div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:1.2rem;text-transform:uppercase;color:#f0ede8;margin-bottom:1.25rem;">${c.name}</div>
+      <div style="font-family:'Barlow Condensed',sans-serif;font-weight:900;font-size:3rem;color:${col};line-height:1;margin-bottom:.25rem;">${waiting.length}</div>
+      <div style="font-family:'DM Mono',monospace;font-size:.6rem;color:#444;text-transform:uppercase;letter-spacing:.08em;margin-bottom:1.25rem;">people waiting</div>
+      <div style="height:6px;background:#1a1b1d;border-radius:3px;overflow:hidden;margin-bottom:1.25rem;"><div style="height:100%;width:${pct}%;background:${col};border-radius:3px;transition:width .6s;"></div></div>
+      <div style="display:flex;justify-content:space-between;margin-bottom:1.25rem;">
+        <div><div style="font-family:'DM Mono',monospace;font-size:.55rem;color:#444;text-transform:uppercase;letter-spacing:.06em;">Avg wait</div><div style="font-family:'DM Mono',monospace;font-size:.82rem;color:${col};margin-top:3px;">~${c.avg_wait}m</div></div>
+        <div style="text-align:right;"><div style="font-family:'DM Mono',monospace;font-size:.55rem;color:#444;text-transform:uppercase;letter-spacing:.06em;">Next token</div><div style="font-family:'DM Mono',monospace;font-size:.82rem;color:#888;margin-top:3px;">${waiting[0]?'#'+waiting[0].token:'—'}</div></div>
+      </div>
+      ${isMine&&myEntry&&myEntry.status==='waiting'?`<div style="background:#0d1f14;border:1px solid #1a6b3c;padding:.6rem .8rem;font-family:'DM Mono',monospace;font-size:.62rem;color:#4caf50;margin-bottom:.75rem;">Your token #${myToken} · position ${myIdx>=0?myIdx+1:'?'}</div>`:''}
+      ${isMine&&myEntry&&myEntry.status==='served'?`<div style="background:#1a6b3c;padding:.6rem .8rem;font-family:'DM Mono',monospace;font-size:.62rem;color:#fff;margin-bottom:.75rem;">✓ Your order is ready!</div>`:''}
+      ${!isMine?`<button onclick="confirmSwitchTo('${c.counter_id}')" style="width:100%;font-family:'DM Mono',monospace;font-size:.65rem;letter-spacing:.06em;text-transform:uppercase;padding:.6rem;background:transparent;border:1px solid #2a2b2d;color:#555;cursor:pointer;" onmouseover="this.style.borderColor='var(--accent)';this.style.color='var(--accent)'" onmouseout="this.style.borderColor='#2a2b2d';this.style.color='#555'">Join this line →</button>`:''}
+    </div>`;
+  });
+}
+
+function renderMyLine(){
+  if(!myCounterId||!myToken) return;
+  const tokens=tokensCache[currentRoomSlug]||[];
+  const ctrs=countersCache[currentRoomSlug]||[];
+  const ctr=ctrs.find(c=>c.counter_id===myCounterId);
+  const waiting=tokens.filter(t=>t.counter_id===myCounterId&&t.status==='waiting');
+  const myEntry=tokens.find(t=>t.token===myToken);
+  const myIdx=myEntry?waiting.findIndex(t=>t.token===myToken):-1;
+  const ahead=myIdx>0?myIdx:0;
+  const isServed=myEntry&&myEntry.status==='served';
+  const vis=document.getElementById('lrv-myline-visual');
+  vis.innerHTML=`<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1.25rem;">
+    <div><div style="font-family:'DM Mono',monospace;font-size:.6rem;color:#4caf50;text-transform:uppercase;letter-spacing:.08em;">Counter ${myCounterId}</div>
+    <div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:1.2rem;text-transform:uppercase;color:#f0ede8;">${ctr?.name||''}</div></div>
+    <div style="text-align:right;"><div style="font-family:'DM Mono',monospace;font-size:.6rem;color:#4caf50;text-transform:uppercase;letter-spacing:.08em;">Your token</div>
+    <div style="font-family:'Barlow Condensed',sans-serif;font-weight:900;font-size:2rem;color:#fff;">#${myToken}</div></div>
+  </div>
+  ${isServed?`<div style="text-align:center;padding:2rem 0;"><div style="font-size:2.5rem;margin-bottom:.75rem;">✅</div><div style="font-family:'Barlow Condensed',sans-serif;font-weight:900;font-size:1.75rem;color:var(--green);text-transform:uppercase;">Your order is ready!</div></div>`:`
+  <div style="margin-bottom:1.25rem;">
+    <div style="display:flex;justify-content:space-between;font-family:'DM Mono',monospace;font-size:.6rem;color:#444;text-transform:uppercase;letter-spacing:.06em;margin-bottom:.5rem;"><span>Queue</span><span>${waiting.length} waiting</span></div>
+    <div style="display:flex;gap:6px;flex-wrap:wrap;">${waiting.map((t,i)=>`<div style="width:36px;height:36px;display:flex;align-items:center;justify-content:center;font-family:'DM Mono',monospace;font-size:.58rem;border-radius:4px;background:${t.token===myToken?'var(--accent)':i===0?'#1a6b3c':'#1a1b1d'};color:${t.token===myToken?'#fff':i===0?'#4caf50':'#555'};border:1px solid ${t.token===myToken?'var(--accent)':i===0?'#1a6b3c':'#2a2b2d'};">${t.token===myToken?'YOU':'#'+t.token}</div>`).join('')}</div>
+  </div>
+  <div style="display:flex;gap:2rem;">
+    <div><div style="font-family:'DM Mono',monospace;font-size:.6rem;color:#444;text-transform:uppercase;letter-spacing:.06em;">Position</div><div style="font-family:'Barlow Condensed',sans-serif;font-weight:900;font-size:1.5rem;color:${ahead===0?'var(--green)':ahead<4?'var(--amber)':'var(--red)'};">${myIdx>=0?myIdx+1:'?'} / ${waiting.length}</div></div>
+    <div><div style="font-family:'DM Mono',monospace;font-size:.6rem;color:#444;text-transform:uppercase;letter-spacing:.06em;">Ahead</div><div style="font-family:'Barlow Condensed',sans-serif;font-weight:900;font-size:1.5rem;color:${ahead===0?'var(--green)':ahead<4?'var(--amber)':'var(--red)'};">${ahead}</div></div>
+    <div><div style="font-family:'DM Mono',monospace;font-size:.6rem;color:#444;text-transform:uppercase;letter-spacing:.06em;">Est. wait</div><div style="font-family:'Barlow Condensed',sans-serif;font-weight:900;font-size:1.5rem;color:#fff;">~${((ctr?.avg_wait||5)+ahead*(ctr?.avg_wait||5)*0.3).toFixed(0)}m</div></div>
+  </div>`}`;
+  const served2=tokens.filter(t=>t.counter_id===myCounterId&&t.status==='served');
+  document.getElementById('lrv-myline-stats').innerHTML=[['Total in counter',tokens.filter(t=>t.counter_id===myCounterId).length],['Waiting',waiting.length],['Served',served2.length],['Avg wait','~'+(ctr?.avg_wait||'?')+'m'],['Next up',waiting[0]?'#'+waiting[0].token:'—']].map(([l,v])=>`<div style="display:flex;justify-content:space-between;padding:.7rem 0;border-bottom:1px solid #1a1b1d;"><span style="font-family:'DM Mono',monospace;font-size:.62rem;color:#444;text-transform:uppercase;letter-spacing:.06em;">${l}</span><span style="font-family:'DM Mono',monospace;font-size:.78rem;color:var(--paper);font-weight:500;">${v}</span></div>`).join('');
+  document.getElementById('lrv-myline-actions').innerHTML=`
+    <button onclick="setLiveTab('browse')" style="font-family:'DM Mono',monospace;font-size:.68rem;letter-spacing:.06em;text-transform:uppercase;padding:.75rem 1rem;background:transparent;border:1px solid #333;color:#888;cursor:pointer;text-align:left;" onmouseover="this.style.color='#fff';this.style.borderColor='#666'" onmouseout="this.style.color='#888';this.style.borderColor='#333'">👁 View all counters →</button>
+    <button onclick="switchCounter()" style="font-family:'DM Mono',monospace;font-size:.68rem;letter-spacing:.06em;text-transform:uppercase;padding:.75rem 1rem;background:transparent;border:1px solid #333;color:#888;cursor:pointer;text-align:left;" onmouseover="this.style.color='#fff';this.style.borderColor='#666'" onmouseout="this.style.color='#888';this.style.borderColor='#333'">⇄ Switch to a shorter line →</button>
+    <button onclick="leaveQueue()" style="font-family:'DM Mono',monospace;font-size:.68rem;letter-spacing:.06em;text-transform:uppercase;padding:.75rem 1rem;background:transparent;border:1px solid #5a1a1a;color:#c44;cursor:pointer;text-align:left;" onmouseover="this.style.background='#1a0808'" onmouseout="this.style.background='transparent'">✕ Leave queue</button>`;
+}
+
+function renderBrowse(){
+  const slug=currentRoomSlug; if(!slug) return;
+  const ctrs=[...countersCache[slug]||[]].sort((a,b)=>{
+    const tokens=tokensCache[slug]||[];
+    return tokens.filter(t=>t.counter_id===a.counter_id&&t.status==='waiting').length - tokens.filter(t=>t.counter_id===b.counter_id&&t.status==='waiting').length;
+  });
+  const tokens=tokensCache[slug]||[];
+  const cont=document.getElementById('lrv-browse-counters'); cont.innerHTML='';
+  const maxW=Math.max(...ctrs.map(c=>tokens.filter(t=>t.counter_id===c.counter_id&&t.status==='waiting').length),1);
+  ctrs.forEach((c,i)=>{
+    const waiting=tokens.filter(t=>t.counter_id===c.counter_id&&t.status==='waiting');
+    const isMine=myCounterId===c.counter_id;
+    const col=waiting.length<=4?'var(--green)':waiting.length<=9?'var(--amber)':'var(--red)';
+    const pct=Math.round(waiting.length/maxW*100);
+    cont.innerHTML+=`<div style="display:grid;grid-template-columns:60px 1fr auto;align-items:center;gap:1.5rem;padding:1.5rem 2rem;background:${isMine?'#0a1a0d':'#111213'};border-bottom:1px solid #1a1b1d;position:relative;">
+      ${i===0?`<div style="position:absolute;top:.6rem;right:5rem;font-family:'DM Mono',monospace;font-size:.55rem;color:var(--green);text-transform:uppercase;letter-spacing:.08em;background:#0d2010;padding:2px 8px;">shortest</div>`:''}
+      ${isMine?`<div style="position:absolute;top:.6rem;right:.75rem;font-family:'DM Mono',monospace;font-size:.55rem;color:#4caf50;text-transform:uppercase;letter-spacing:.08em;background:#0d1f14;padding:2px 8px;border:1px solid #1a6b3c;">your line</div>`:''}
+      <div style="text-align:center;"><div style="font-family:'Barlow Condensed',sans-serif;font-weight:900;font-size:2.2rem;color:${col};line-height:1;">${waiting.length}</div><div style="font-family:'DM Mono',monospace;font-size:.55rem;color:#444;text-transform:uppercase;margin-top:2px;">waiting</div></div>
+      <div>
+        <div style="display:flex;align-items:center;gap:.75rem;margin-bottom:.5rem;">
+          <span style="font-family:'DM Mono',monospace;font-size:.6rem;color:${isMine?'#4caf50':'#555'};letter-spacing:.1em;text-transform:uppercase;">${c.counter_id}</span>
+          <span style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:1rem;text-transform:uppercase;color:#f0ede8;">${c.name}</span>
+          <span style="font-family:'DM Mono',monospace;font-size:.65rem;color:${col};">~${c.avg_wait}m avg</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:.75rem;">
+          <div style="flex:1;height:5px;background:#1a1b1d;border-radius:3px;overflow:hidden;max-width:320px;"><div style="height:100%;width:${pct}%;background:${col};border-radius:3px;transition:width .5s;"></div></div>
+          <span style="font-family:'DM Mono',monospace;font-size:.6rem;color:#444;">${waiting[0]?'next: #'+waiting[0].token:'empty'}</span>
+        </div>
+      </div>
+      <div>${!isMine?`<button onclick="confirmSwitchTo('${c.counter_id}')" style="font-family:'DM Mono',monospace;font-size:.65rem;letter-spacing:.06em;text-transform:uppercase;padding:.6rem 1.25rem;background:transparent;border:1px solid #2a2b2d;color:#555;cursor:pointer;" onmouseover="this.style.borderColor='var(--accent)';this.style.color='var(--accent)'" onmouseout="this.style.borderColor='#2a2b2d';this.style.color='#555'">Join →</button>`:`<div style="font-family:'DM Mono',monospace;font-size:.65rem;color:#4caf50;text-transform:uppercase;letter-spacing:.06em;">✓ Joined</div>`}</div>
+    </div>`;
+  });
+}
+
+function renderQueueList(){
+  if(!myCounterId) return;
+  const tokens=tokensCache[currentRoomSlug]||[];
+  const tbody=document.getElementById('lrv-queue-tbody'); tbody.innerHTML='';
+  const waiting=tokens.filter(t=>t.counter_id===myCounterId&&t.status==='waiting');
+  waiting.forEach((t,i)=>{
+    const isMine=t.token===myToken;
+    const elapsed=Math.floor((Date.now()-new Date(t.joined_at))/60000);
+    tbody.innerHTML+=`<tr style="background:${isMine?'#0a1a0d':'transparent'};border-bottom:1px solid #1a1b1d;">
+      <td style="font-family:'DM Mono',monospace;font-size:.7rem;color:${isMine?'#4caf50':'#444'};padding:.85rem 1.25rem;">${i+1}</td>
+      <td style="font-family:'DM Mono',monospace;font-size:.78rem;color:${isMine?'#fff':'#aaa'};padding:.85rem 1.25rem;font-weight:${isMine?700:400};">#${t.token}${isMine?' ← you':''}</td>
+      <td style="font-family:'DM Mono',monospace;font-size:.7rem;color:#555;padding:.85rem 1.25rem;">${new Date(t.joined_at).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})}</td>
+      <td style="font-family:'DM Mono',monospace;font-size:.7rem;color:${elapsed>10?'var(--amber)':'#666'};padding:.85rem 1.25rem;">${elapsed}m</td>
+      <td style="font-family:'DM Mono',monospace;font-size:.7rem;color:var(--amber);padding:.85rem 1.25rem;text-transform:uppercase;letter-spacing:.06em;">waiting</td>
+    </tr>`;
+  });
+  tokens.filter(t=>t.counter_id===myCounterId&&t.status==='served').slice(-5).forEach(t=>{
+    tbody.innerHTML+=`<tr style="border-bottom:1px solid #1a1b1d;opacity:.4;">
+      <td style="font-family:'DM Mono',monospace;font-size:.7rem;color:#333;padding:.85rem 1.25rem;">—</td>
+      <td style="font-family:'DM Mono',monospace;font-size:.78rem;color:#444;padding:.85rem 1.25rem;text-decoration:line-through;">#${t.token}</td>
+      <td colspan="2" style="font-family:'DM Mono',monospace;font-size:.7rem;color:#333;padding:.85rem 1.25rem;">served</td>
+      <td style="font-family:'DM Mono',monospace;font-size:.7rem;color:var(--green);padding:.85rem 1.25rem;text-transform:uppercase;letter-spacing:.06em;">✓ served</td>
+    </tr>`;
+  });
+}
+
+// ═══════════════════════════════════════════
+// SWITCH COUNTER
+// ═══════════════════════════════════════════
+function switchCounter(){
+  const ctrs=countersCache[currentRoomSlug]||[];
+  const tokens=tokensCache[currentRoomSlug]||[];
+  const opts=document.getElementById('switch-options'); opts.innerHTML='';
+  const sorted=[...ctrs].filter(c=>c.counter_id!==myCounterId).sort((a,b)=>tokens.filter(t=>t.counter_id===a.counter_id&&t.status==='waiting').length-tokens.filter(t=>t.counter_id===b.counter_id&&t.status==='waiting').length);
+  sorted.forEach(c=>{
+    const w=tokens.filter(t=>t.counter_id===c.counter_id&&t.status==='waiting').length;
+    const col=w<=4?'var(--green)':w<=9?'var(--amber)':'var(--red)';
+    opts.innerHTML+=`<div style="display:flex;align-items:center;justify-content:space-between;padding:1rem 1.25rem;background:#111213;border-bottom:1px solid #1a1b1d;">
+      <div><span style="font-family:'DM Mono',monospace;font-size:.6rem;color:#555;text-transform:uppercase;letter-spacing:.08em;">${c.counter_id} · </span><span style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:.95rem;text-transform:uppercase;color:#f0ede8;">${c.name}</span><span style="font-family:'DM Mono',monospace;font-size:.65rem;color:${col};margin-left:.75rem;">${w} waiting · ~${c.avg_wait}m</span></div>
+      <button onclick="doSwitch('${c.counter_id}')" style="font-family:'DM Mono',monospace;font-size:.65rem;letter-spacing:.06em;text-transform:uppercase;padding:.5rem 1rem;background:var(--accent);color:#fff;border:none;cursor:pointer;">Switch →</button>
+    </div>`;
+  });
+  document.getElementById('switch-modal').classList.add('show');
+}
+function confirmSwitchTo(cid){ if(!myCounterId||myCounterId===cid) return; doSwitch(cid); }
+async function doSwitch(cid){
+  if(!myRoomSlug||!myTokenId) return;
+  const ctrs=countersCache[myRoomSlug]||[];
+  const newC=ctrs.find(c=>c.counter_id===cid); if(!newC) return;
+
+  // delete old token, create new one
+  await sb.from('tokens').delete().eq('id',myTokenId);
+  const tokens=tokensCache[myRoomSlug]||[];
+  const nextNum=Math.max(0,...tokens.map(t=>parseInt(t.token)))+1;
+  const newTokenStr=String(nextNum).padStart(3,'0');
+  const { data } = await sb.from('tokens').insert({ token:newTokenStr, room_slug:myRoomSlug, counter_id:cid, status:'waiting' }).select().single();
+  myToken=newTokenStr; myTokenId=data.id; myCounterId=cid;
+  await loadTokens(myRoomSlug);
+  closeSwitchModal();
+  updateBanner();
+  renderLiveRoom();
+  showToast(`⇄ Switched to ${newC.name}`,`New token #${newTokenStr}`);
+}
+function closeSwitchModal(){ document.getElementById('switch-modal').classList.remove('show'); }
+
+async function leaveQueue(){
+  if(!myToken||!myTokenId) return;
+  if(!confirm('Leave the queue? Your token will be removed.')) return;
+  await sb.from('tokens').delete().eq('id',myTokenId);
+  myToken=null; myTokenId=null; myCounterId=null; myRoomSlug=null;
+  document.getElementById('token-banner').classList.remove('show');
+  document.getElementById('live-room-view').style.display='none';
+  showToast('✓ Left queue','You have been removed.');
+  updateLiveStats();
+}
+
+// ═══════════════════════════════════════════
+// NOTIFICATIONS
+// ═══════════════════════════════════════════
+function requestNotifications(){
+  if(!('Notification' in window)){ alert('Notifications not supported in this browser.'); return; }
+  Notification.requestPermission().then(p=>{
+    notifEnabled=p==='granted';
+    const btn=document.getElementById('notif-btn');
+    btn.textContent=notifEnabled?'🔔 Alerts on':'Blocked';
+    btn.classList.toggle('enabled',notifEnabled);
+  });
+}
+function fireServedNotification(token, counterId){
+  const ctrs=countersCache[myRoomSlug]||[];
+  const ctr=ctrs.find(c=>c.counter_id===counterId);
+  updateBanner(); renderActiveTab();
+  showToast(`🔔 Token #${token} — ready!`,`Head to counter ${counterId} · ${ctr?.name||''}`);
+  if(notifEnabled&&Notification.permission==='granted'){
+    try{ new Notification('Lineup — Your order is ready!',{body:`Token #${token} · Counter ${counterId} · ${ctr?.name||''}`}); }catch(e){}
+  }
+}
+
+// ═══════════════════════════════════════════
+// MISC
+// ═══════════════════════════════════════════
+document.getElementById('owner-overlay').addEventListener('click',e=>{ if(e.target===document.getElementById('owner-overlay')) closeOwnerModal(); });
+document.getElementById('switch-modal').addEventListener('click',e=>{ if(e.target===document.getElementById('switch-modal')) closeSwitchModal(); });
+
+// Start
+init();
+</script>
+</body>
+</html>
